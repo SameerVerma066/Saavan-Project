@@ -35,9 +35,26 @@ type MusicState = {
   setPlaybackPosition: (positionMillis: number, durationMillis: number) => void;
   toggleShuffle: () => void;
   cycleRepeatMode: () => void;
+  sanitizeQueue: () => void;
 };
 
 const SEARCH_PAGE_LIMIT = 20;
+
+function dedupeTracksById(tracks: Track[]) {
+  const seen = new Set<string>();
+  const unique: Track[] = [];
+
+  for (const track of tracks) {
+    if (seen.has(track.id)) {
+      continue;
+    }
+
+    seen.add(track.id);
+    unique.push(track);
+  }
+
+  return unique;
+}
 
 export const useMusicStore = create<MusicState>()(
   persist(
@@ -71,8 +88,10 @@ export const useMusicStore = create<MusicState>()(
             limit: SEARCH_PAGE_LIMIT,
           });
 
+          const uniqueTracks = dedupeTracksById(result.tracks);
+
           set({
-            searchResults: result.tracks,
+            searchResults: uniqueTracks,
             searchPage: 1,
             hasMoreSearchResults: result.hasMore,
             totalSearchResults: result.total,
@@ -80,8 +99,8 @@ export const useMusicStore = create<MusicState>()(
             searchError: null,
           });
 
-          if (get().queue.length === 0 && result.tracks.length > 0) {
-            set({ queue: result.tracks, currentIndex: 0 });
+          if (get().queue.length === 0 && uniqueTracks.length > 0) {
+            set({ queue: uniqueTracks, currentIndex: 0 });
           }
         } catch (error) {
           set({
@@ -110,7 +129,10 @@ export const useMusicStore = create<MusicState>()(
           });
 
           set((state) => ({
-            searchResults: [...state.searchResults, ...result.tracks],
+            searchResults: dedupeTracksById([
+              ...state.searchResults,
+              ...result.tracks,
+            ]),
             searchPage: nextPage,
             hasMoreSearchResults: result.hasMore,
             totalSearchResults: result.total,
@@ -222,7 +244,9 @@ export const useMusicStore = create<MusicState>()(
       },
 
       setQueueAndIndex: (queue, index) => {
-        if (queue.length === 0) {
+        const uniqueQueue = dedupeTracksById(queue);
+
+        if (uniqueQueue.length === 0) {
           set({
             queue: [],
             currentIndex: -1,
@@ -234,8 +258,8 @@ export const useMusicStore = create<MusicState>()(
         }
 
         set({
-          queue,
-          currentIndex: Math.max(0, Math.min(index, queue.length - 1)),
+          queue: uniqueQueue,
+          currentIndex: Math.max(0, Math.min(index, uniqueQueue.length - 1)),
         });
       },
 
@@ -272,6 +296,33 @@ export const useMusicStore = create<MusicState>()(
 
           return { repeatMode: "off" };
         }),
+
+      sanitizeQueue: () => {
+        set((state) => {
+          if (state.queue.length <= 1) {
+            return state;
+          }
+
+          const currentTrackId = state.queue[state.currentIndex]?.id;
+          const uniqueQueue = dedupeTracksById(state.queue);
+
+          if (uniqueQueue.length === state.queue.length) {
+            return state;
+          }
+
+          const nextIndex = currentTrackId
+            ? uniqueQueue.findIndex((track) => track.id === currentTrackId)
+            : -1;
+
+          return {
+            queue: uniqueQueue,
+            currentIndex:
+              nextIndex >= 0
+                ? nextIndex
+                : Math.min(state.currentIndex, uniqueQueue.length - 1),
+          };
+        });
+      },
     }),
     {
       name: "music-store-v1",

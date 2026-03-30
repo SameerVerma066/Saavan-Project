@@ -49,6 +49,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
   const toggleShuffle = useMusicStore((state) => state.toggleShuffle);
   const cycleRepeatMode = useMusicStore((state) => state.cycleRepeatMode);
+  const sanitizeQueue = useMusicStore((state) => state.sanitizeQueue);
 
   const currentTrack = queue[currentTrackIndex] ?? null;
 
@@ -238,6 +239,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    sanitizeQueue();
+
     void Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
@@ -249,7 +252,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => {
       void unloadCurrentSound();
     };
-  }, [unloadCurrentSound]);
+  }, [sanitizeQueue, unloadCurrentSound]);
 
   useEffect(() => {
     if (queue.length === 0 || currentTrackIndex < 0) {

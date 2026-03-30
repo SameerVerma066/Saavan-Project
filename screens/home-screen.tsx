@@ -69,7 +69,7 @@ export function HomeScreen() {
 
         <FlatList
           data={searchResults}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           contentContainerStyle={styles.listContent}
           onEndReachedThreshold={0.4}
           onEndReached={() => {

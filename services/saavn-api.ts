@@ -15,10 +15,18 @@ type SaavnSongDownloadUrl = {
   url?: string;
 };
 
+type SaavnArtist = {
+  id?: string;
+  name?: string;
+};
+
 type SaavnSearchSong = {
   id: string;
   name?: string;
-  primaryArtists?: string;
+  primaryArtists?: string | SaavnArtist[];
+  artists?: {
+    primary?: SaavnArtist[];
+  };
   album?: {
     name?: string;
     url?: string;
@@ -79,6 +87,35 @@ function getBestArtwork(images: SaavnSongImage[]) {
   return images[0]?.url ?? images[0]?.link ?? "https://picsum.photos/500";
 }
 
+function getArtistName(song: SaavnSearchSong) {
+  if (typeof song.primaryArtists === "string") {
+    const trimmed = song.primaryArtists.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  if (Array.isArray(song.primaryArtists)) {
+    const names = song.primaryArtists
+      .map((artist) => artist.name?.trim() ?? "")
+      .filter((name) => name.length > 0);
+
+    if (names.length > 0) {
+      return names.join(", ");
+    }
+  }
+
+  const primaryFromArtists = (song.artists?.primary ?? [])
+    .map((artist) => artist.name?.trim() ?? "")
+    .filter((name) => name.length > 0);
+
+  if (primaryFromArtists.length > 0) {
+    return primaryFromArtists.join(", ");
+  }
+
+  return "Unknown Artist";
+}
+
 function normalizeSong(song: SaavnSearchSong): Track {
   const durationSeconds = Number(song.duration ?? 0) || 0;
   const downloadInfo = getPreferredDownloadUrl(song.downloadUrl ?? []);
@@ -86,7 +123,7 @@ function normalizeSong(song: SaavnSearchSong): Track {
   return {
     id: song.id,
     title: song.name ?? "Unknown Title",
-    artist: song.primaryArtists ?? "Unknown Artist",
+    artist: getArtistName(song),
     album: song.album?.name ?? "Unknown Album",
     artwork: getBestArtwork(song.image ?? []),
     durationMillis: durationSeconds * 1000,
