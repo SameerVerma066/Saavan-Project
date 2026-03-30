@@ -50,7 +50,11 @@ export function PlayerScreen() {
         <Image source={{ uri: currentTrack.artwork }} style={styles.artwork} />
 
         <Text style={styles.title}>{currentTrack.title}</Text>
-        <Text style={styles.artist}>{currentTrack.artist}</Text>
+        <Text style={styles.artist}>
+          {currentTrack.artist && currentTrack.artist.trim().length > 0
+            ? currentTrack.artist
+            : "Unknown Artist"}
+        </Text>
 
         <Pressable
           style={styles.progressTrack}

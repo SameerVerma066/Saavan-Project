@@ -8,7 +8,13 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 
 const TAB_SCREEN_OPTIONS = {
-  tabBarActiveTintColor: Colors.light.tint,
+  tabBarActiveTintColor: Colors.dark.tint,
+  tabBarInactiveTintColor: Colors.dark.tabIconDefault,
+  tabBarStyle: {
+    backgroundColor: Colors.dark.background,
+    borderTopColor: "#262641",
+    borderTopWidth: 1,
+  },
   headerShown: false,
   tabBarButton: HapticTab,
 } as const;

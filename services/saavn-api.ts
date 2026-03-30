@@ -87,30 +87,41 @@ function getBestArtwork(images: SaavnSongImage[]) {
   return images[0]?.url ?? images[0]?.link ?? "https://picsum.photos/500";
 }
 
-function getArtistName(song: SaavnSearchSong) {
-  if (typeof song.primaryArtists === "string") {
-    const trimmed = song.primaryArtists.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
+function getArtistName(song: SaavnSearchSong): string {
+  try {
+    // Try primaryArtists as string first
+    if (typeof song.primaryArtists === "string") {
+      const trimmed = song.primaryArtists.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
     }
-  }
 
-  if (Array.isArray(song.primaryArtists)) {
-    const names = song.primaryArtists
-      .map((artist) => artist.name?.trim() ?? "")
+    // Try primaryArtists as array
+    if (Array.isArray(song.primaryArtists)) {
+      const names = song.primaryArtists
+        .map((artist) => {
+          if (!artist) return "";
+          const name = typeof artist === "string" ? artist : artist.name;
+          return name?.trim() ?? "";
+        })
+        .filter((name) => name.length > 0);
+
+      if (names.length > 0) {
+        return names.join(", ");
+      }
+    }
+
+    // Try artists.primary array
+    const primaryFromArtists = (song.artists?.primary ?? [])
+      .map((artist) => artist?.name?.trim() ?? "")
       .filter((name) => name.length > 0);
 
-    if (names.length > 0) {
-      return names.join(", ");
+    if (primaryFromArtists.length > 0) {
+      return primaryFromArtists.join(", ");
     }
-  }
-
-  const primaryFromArtists = (song.artists?.primary ?? [])
-    .map((artist) => artist.name?.trim() ?? "")
-    .filter((name) => name.length > 0);
-
-  if (primaryFromArtists.length > 0) {
-    return primaryFromArtists.join(", ");
+  } catch (error) {
+    // Silently handle any parsing errors
   }
 
   return "Unknown Artist";

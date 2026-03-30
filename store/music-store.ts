@@ -59,7 +59,7 @@ function dedupeTracksById(tracks: Track[]) {
 export const useMusicStore = create<MusicState>()(
   persist(
     (set, get) => ({
-      searchQuery: "arijit",
+      searchQuery: "",
       isLoadingSearch: false,
       searchError: null,
       searchResults: [],
@@ -299,27 +299,43 @@ export const useMusicStore = create<MusicState>()(
 
       sanitizeQueue: () => {
         set((state) => {
-          if (state.queue.length <= 1) {
+          if (state.queue.length === 0) {
             return state;
           }
 
           const currentTrackId = state.queue[state.currentIndex]?.id;
+
+          // Deduplicate tracks
           const uniqueQueue = dedupeTracksById(state.queue);
 
-          if (uniqueQueue.length === state.queue.length) {
+          // Ensure all tracks have proper artist names
+          const cleanedQueue = uniqueQueue.map((track) => ({
+            ...track,
+            artist:
+              track.artist && track.artist.trim().length > 0
+                ? track.artist
+                : "Unknown Artist",
+          }));
+
+          if (
+            cleanedQueue.length === state.queue.length &&
+            cleanedQueue.every(
+              (track, idx) => track.artist === state.queue[idx]?.artist,
+            )
+          ) {
             return state;
           }
 
           const nextIndex = currentTrackId
-            ? uniqueQueue.findIndex((track) => track.id === currentTrackId)
+            ? cleanedQueue.findIndex((track) => track.id === currentTrackId)
             : -1;
 
           return {
-            queue: uniqueQueue,
+            queue: cleanedQueue,
             currentIndex:
               nextIndex >= 0
                 ? nextIndex
-                : Math.min(state.currentIndex, uniqueQueue.length - 1),
+                : Math.min(state.currentIndex, cleanedQueue.length - 1),
           };
         });
       },

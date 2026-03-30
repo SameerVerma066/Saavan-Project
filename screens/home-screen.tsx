@@ -1,21 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useEffect } from "react";
+import { useState } from "react";
 import {
-    ActivityIndicator,
     FlatList,
     Pressable,
     SafeAreaView,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from "react-native";
 
 import { usePlayer } from "@/context/player-context";
 import { useMusicStore } from "@/store/music-store";
 
+const ACCENT_COLOR = "#FF8A65";
+const BACKGROUND = "#1a1a2e";
+const SECONDARY_BG = "#262641";
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#b0b0b0";
+
+const TABS = ["Suggested", "Songs", "Artists", "Albums"];
+
 export function HomeScreen() {
+  const [activeTab, setActiveTab] = useState(0);
   const searchQuery = useMusicStore((state) => state.searchQuery);
   const searchResults = useMusicStore((state) => state.searchResults);
   const isLoadingSearch = useMusicStore((state) => state.isLoadingSearch);
@@ -31,102 +40,192 @@ export function HomeScreen() {
 
   const { playTrack, queue } = usePlayer();
 
-  useEffect(() => {
-    if (searchResults.length === 0) {
-      void loadInitialSongs();
-    }
-  }, [loadInitialSongs, searchResults.length]);
+  // Get different sections
+  const recentlyPlayed = searchResults.slice(0, 6);
+  const artists = searchResults.slice(0, 3);
+  const mostPlayed = searchResults.slice(0, 6);
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.heading}>Home</Text>
-        <Text style={styles.subheading}>
-          Search songs from JioSaavn and add to queue
-        </Text>
+      <View style={styles.header}>
+        {/* Logo & Search */}
+        <View style={styles.topBar}>
+          <View style={styles.logoSection}>
+            <Ionicons name="musical-notes" size={24} color={ACCENT_COLOR} />
+            <Text style={styles.appName}>Mume</Text>
+          </View>
+          <Pressable>
+            <Ionicons name="search" size={24} color={TEXT_PRIMARY} />
+          </Pressable>
+        </View>
 
+        {/* Tab Navigation */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsContainer}
+          contentContainerStyle={styles.tabsContent}
+        >
+          {TABS.map((tab, idx) => (
+            <Pressable
+              key={idx}
+              style={[styles.tab, activeTab === idx && styles.tabActive]}
+              onPress={() => setActiveTab(idx)}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === idx && styles.tabTextActive,
+                ]}
+              >
+                {tab}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Content */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Search Bar */}
         <View style={styles.searchRow}>
+          <Ionicons
+            name="search"
+            size={18}
+            color={TEXT_SECONDARY}
+            style={styles.searchIcon}
+          />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search songs, artist, album"
-            placeholderTextColor="#94a3b8"
+            placeholder="Search songs..."
+            placeholderTextColor={TEXT_SECONDARY}
             style={styles.input}
             onSubmitEditing={() => void loadInitialSongs()}
             returnKeyType="search"
           />
-          <Pressable
-            style={styles.searchButton}
-            onPress={() => void loadInitialSongs()}
-          >
-            <Ionicons name="search" size={18} color="#ffffff" />
-          </Pressable>
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <Ionicons name="close" size={18} color={TEXT_SECONDARY} />
+            </Pressable>
+          )}
         </View>
 
-        {searchError ? (
-          <Text style={styles.errorText}>{searchError}</Text>
-        ) : null}
-
-        <FlatList
-          data={searchResults}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
-          contentContainerStyle={styles.listContent}
-          onEndReachedThreshold={0.4}
-          onEndReached={() => {
-            if (!isLoadingSearch && hasMoreSearchResults) {
-              void loadMoreSongs();
-            }
-          }}
-          ListFooterComponent={
-            isLoadingSearch ? (
-              <ActivityIndicator color="#0284c7" size="small" />
-            ) : null
-          }
-          renderItem={({ item }) => {
-            const queueIndex = queue.findIndex((track) => track.id === item.id);
-
-            return (
+        {/* Recently Played Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recently Played</Text>
+            <Pressable>
+              <Text style={styles.seeAll}>See All</Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={recentlyPlayed}
+            keyExtractor={(item, idx) => `${item.id}-recent-${idx}`}
+            numColumns={2}
+            scrollEnabled={false}
+            columnWrapperStyle={styles.gridRow}
+            renderItem={({ item }) => (
               <Pressable
-                style={styles.row}
+                style={styles.gridCard}
                 onPress={async () => {
                   playSearchTrackNow(item);
                   const state = useMusicStore.getState();
                   await playTrack(state.currentIndex);
                 }}
               >
-                <Image source={{ uri: item.artwork }} style={styles.cover} />
-
-                <View style={styles.textWrap}>
-                  <Text numberOfLines={1} style={styles.title}>
-                    {item.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.meta}>
-                    {item.artist} • {item.album}
-                  </Text>
-                </View>
-
-                <View style={styles.actions}>
-                  <Text style={styles.duration}>{item.durationLabel}</Text>
-                  <Pressable
-                    style={styles.addButton}
-                    onPress={() => {
-                      if (queueIndex < 0) {
-                        addTrackToQueue(item);
-                      }
-                    }}
-                  >
-                    <Ionicons
-                      name={queueIndex >= 0 ? "checkmark" : "add"}
-                      size={16}
-                      color={queueIndex >= 0 ? "#16a34a" : "#0284c7"}
-                    />
-                  </Pressable>
-                </View>
+                <Image
+                  source={{ uri: item.artwork }}
+                  style={styles.gridImage}
+                />
+                <Text numberOfLines={2} style={styles.gridTitle}>
+                  {item.title}
+                </Text>
+                <Text numberOfLines={1} style={styles.gridArtist}>
+                  {item.artist}
+                </Text>
               </Pressable>
-            );
-          }}
-        />
-      </View>
+            )}
+          />
+        </View>
+
+        {/* Artists Section */}
+        {artists.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Artists</Text>
+              <Pressable>
+                <Text style={styles.seeAll}>See All</Text>
+              </Pressable>
+            </View>
+            <FlatList
+              data={artists}
+              keyExtractor={(item, idx) => `${item.id}-artist-${idx}`}
+              numColumns={3}
+              scrollEnabled={false}
+              columnWrapperStyle={styles.artistRow}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.artistCard}
+                  onPress={async () => {
+                    playSearchTrackNow(item);
+                    const state = useMusicStore.getState();
+                    await playTrack(state.currentIndex);
+                  }}
+                >
+                  <Image
+                    source={{ uri: item.artwork }}
+                    style={styles.artistImage}
+                  />
+                  <Text numberOfLines={1} style={styles.artistName}>
+                    {item.artist}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        )}
+
+        {/* Most Played Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Most Played</Text>
+            <Pressable>
+              <Text style={styles.seeAll}>See All</Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={mostPlayed}
+            keyExtractor={(item, idx) => `${item.id}-most-${idx}`}
+            numColumns={2}
+            scrollEnabled={false}
+            columnWrapperStyle={styles.gridRow}
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.gridCard}
+                onPress={async () => {
+                  playSearchTrackNow(item);
+                  const state = useMusicStore.getState();
+                  await playTrack(state.currentIndex);
+                }}
+              >
+                <Image
+                  source={{ uri: item.artwork }}
+                  style={styles.gridImage}
+                />
+                <Text numberOfLines={2} style={styles.gridTitle}>
+                  {item.title}
+                </Text>
+                <Text numberOfLines={1} style={styles.gridArtist}>
+                  {item.artist}
+                </Text>
+              </Pressable>
+            )}
+          />
+        </View>
+
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -134,101 +233,142 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: BACKGROUND,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: SECONDARY_BG,
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    marginTop: 12,
+  },
+  logoSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  appName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: TEXT_PRIMARY,
+  },
+  tabsContainer: {
+    marginHorizontal: -16,
+  },
+  tabsContent: {
+    paddingHorizontal: 16,
+    gap: 4,
+  },
+  tab: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabActive: {
+    borderBottomColor: ACCENT_COLOR,
+  },
+  tabText: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+    fontWeight: "500",
+  },
+  tabTextActive: {
+    color: ACCENT_COLOR,
+    fontWeight: "700",
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  subheading: {
-    marginTop: 6,
-    color: "#64748b",
-    fontSize: 13,
   },
   searchRow: {
-    marginTop: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    backgroundColor: SECONDARY_BG,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 24,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   input: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 12,
-    color: "#0f172a",
     fontSize: 14,
+    color: TEXT_PRIMARY,
   },
-  searchButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#0284c7",
+  section: {
+    marginBottom: 32,
+    paddingHorizontal: 16,
   },
-  errorText: {
-    marginTop: 8,
-    color: "#dc2626",
-    fontSize: 12,
-  },
-  listContent: {
-    paddingTop: 14,
-    paddingBottom: 140,
-    gap: 10,
-  },
-  row: {
+  sectionHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#ffffff",
-    padding: 10,
+    marginBottom: 16,
   },
-  cover: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-    backgroundColor: "#e2e8f0",
-  },
-  textWrap: {
-    flex: 1,
-  },
-  title: {
-    color: "#0f172a",
-    fontSize: 15,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: "700",
+    color: TEXT_PRIMARY,
   },
-  meta: {
-    marginTop: 3,
-    color: "#64748b",
-    fontSize: 12,
+  seeAll: {
+    fontSize: 13,
+    color: ACCENT_COLOR,
+    fontWeight: "600",
   },
-  actions: {
-    alignItems: "flex-end",
-    gap: 8,
+  gridRow: {
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  duration: {
-    color: "#475569",
-    fontSize: 12,
+  gridCard: {
+    width: "48%",
   },
-  addButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  gridImage: {
+    width: "100%",
+    height: 160,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  gridTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: TEXT_PRIMARY,
+    marginBottom: 4,
+  },
+  gridArtist: {
+    fontSize: 11,
+    color: TEXT_SECONDARY,
+  },
+  artistRow: {
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  artistCard: {
+    width: "30%",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#e2e8f0",
+  },
+  artistImage: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 100,
+    marginBottom: 8,
+  },
+  artistName: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: TEXT_PRIMARY,
+    textAlign: "center",
+  },
+  bottomSpacer: {
+    height: 100,
   },
 });
