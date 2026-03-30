@@ -30,7 +30,7 @@ export function QueueScreen() {
 
         <FlatList
           data={queue}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <Text style={styles.empty}>No songs in queue yet.</Text>
