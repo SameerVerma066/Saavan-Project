@@ -32,6 +32,8 @@ type MusicState = {
   randomArtists: Track[];
   isLoadingSuggestions: boolean;
   suggestionsError: string | null;
+  // Liked songs state
+  likedSongs: Track[];
   // Methods
   setSearchQuery: (query: string) => void;
   loadInitialSongs: () => Promise<void>;
@@ -50,6 +52,10 @@ type MusicState = {
   // Suggested tab methods
   loadSuggestedTab: () => Promise<void>;
   addToRecentlyPlayed: (track: Track) => void;
+  // Likes methods
+  toggleLike: (track: Track) => void;
+  isLiked: (trackId: string) => boolean;
+  removeLike: (trackId: string) => void;
 };
 
 const SEARCH_PAGE_LIMIT = 20;
@@ -93,6 +99,8 @@ export const useMusicStore = create<MusicState>()(
       randomArtists: [],
       isLoadingSuggestions: false,
       suggestionsError: null,
+      // Liked songs state
+      likedSongs: [],
 
       setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -400,6 +408,36 @@ export const useMusicStore = create<MusicState>()(
           };
         });
       },
+
+      toggleLike: (track) => {
+        set((state) => {
+          const isLiked = state.likedSongs.some((item) => item.id === track.id);
+
+          if (isLiked) {
+            // Remove from liked
+            return {
+              likedSongs: state.likedSongs.filter(
+                (item) => item.id !== track.id,
+              ),
+            };
+          } else {
+            // Add to liked
+            return {
+              likedSongs: [track, ...state.likedSongs],
+            };
+          }
+        });
+      },
+
+      isLiked: (trackId) => {
+        return get().likedSongs.some((item) => item.id === trackId);
+      },
+
+      removeLike: (trackId) => {
+        set((state) => ({
+          likedSongs: state.likedSongs.filter((item) => item.id !== trackId),
+        }));
+      },
     }),
     {
       name: "music-store-v1",
@@ -410,6 +448,7 @@ export const useMusicStore = create<MusicState>()(
         shuffleEnabled: state.shuffleEnabled,
         repeatMode: state.repeatMode,
         recentlyPlayed: state.recentlyPlayed,
+        likedSongs: state.likedSongs,
       }),
     },
   ),

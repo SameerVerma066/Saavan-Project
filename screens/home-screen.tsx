@@ -52,6 +52,11 @@ export function HomeScreen() {
     (state) => state.addToRecentlyPlayed,
   );
 
+  // Liked songs state
+  const likedSongs = useMusicStore((state) => state.likedSongs);
+  const toggleLike = useMusicStore((state) => state.toggleLike);
+  const isLiked = useMusicStore((state) => state.isLiked);
+
   const { playTrack } = usePlayer();
 
   // Load suggestions when Suggested tab is focused
@@ -216,8 +221,66 @@ export function HomeScreen() {
           </>
         )}
 
+        {/* Songs Tab - Liked Songs List */}
+        {activeTab === 1 && (
+          <>
+            {likedSongs.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons
+                  name="heart-outline"
+                  size={64}
+                  color={TEXT_SECONDARY}
+                />
+                <Text style={styles.emptyText}>No liked songs yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Like songs to see them here
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.listContainer}>
+                <FlatList
+                  data={likedSongs}
+                  keyExtractor={(item, idx) => `${item.id}-liked-${idx}`}
+                  scrollEnabled={false}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.songListItem}
+                      onPress={() => handlePlayTrack(item)}
+                    >
+                      <Image
+                        source={{ uri: item.artwork }}
+                        style={styles.songListImage}
+                      />
+                      <View style={styles.songListContent}>
+                        <Text numberOfLines={1} style={styles.songListTitle}>
+                          {item.title}
+                        </Text>
+                        <Text numberOfLines={1} style={styles.songListArtist}>
+                          {item.artist}
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={styles.likeButton}
+                        onPress={() => toggleLike(item)}
+                      >
+                        <Ionicons
+                          name={isLiked(item.id) ? "heart" : "heart-outline"}
+                          size={24}
+                          color={
+                            isLiked(item.id) ? ACCENT_COLOR : TEXT_SECONDARY
+                          }
+                        />
+                      </Pressable>
+                    </Pressable>
+                  )}
+                />
+              </View>
+            )}
+          </>
+        )}
+
         {/* Other Tabs - Search Results */}
-        {activeTab !== 0 && (
+        {activeTab !== 0 && activeTab !== 1 && (
           <>
             {/* Search Bar */}
             <View style={styles.searchRow}>
@@ -481,6 +544,64 @@ const styles = StyleSheet.create({
   errorText: {
     color: "#FF6B6B",
     fontSize: 14,
+    textAlign: "center",
+  },
+  // Song list styles
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  songListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: SECONDARY_BG,
+    borderRadius: 12,
+  },
+  songListImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  songListContent: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  songListTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: TEXT_PRIMARY,
+    marginBottom: 4,
+  },
+  songListArtist: {
+    fontSize: 12,
+    color: TEXT_SECONDARY,
+  },
+  likeButton: {
+    padding: 8,
+  },
+  // Empty state styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 400,
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: TEXT_PRIMARY,
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+    marginTop: 8,
     textAlign: "center",
   },
   bottomSpacer: {
