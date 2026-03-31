@@ -243,6 +243,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     try {
       let nextIndex = state.currentIndex + 1;
 
+      if (state.shuffleEnabled && state.queue.length > 1) {
+        do {
+          nextIndex = Math.floor(Math.random() * state.queue.length);
+        } while (nextIndex === state.currentIndex);
+
+        await playTrackAtIndex(nextIndex, true, 0);
+        return;
+      }
+
       if (nextIndex >= state.queue.length) {
         if (state.repeatMode === "all") {
           nextIndex = 0;
@@ -270,6 +279,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     isTransitioningRef.current = true;
     try {
       let prevIndex = state.currentIndex - 1;
+
+      if (state.shuffleEnabled && state.queue.length > 1) {
+        do {
+          prevIndex = Math.floor(Math.random() * state.queue.length);
+        } while (prevIndex === state.currentIndex);
+
+        await playTrackAtIndex(prevIndex, true, 0);
+        return;
+      }
 
       if (prevIndex < 0) {
         prevIndex = state.queue.length - 1;
