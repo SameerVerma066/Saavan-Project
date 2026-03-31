@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePlayer } from "@/context/player-context";
 import { useMusicStore } from "@/store/music-store";
@@ -26,6 +27,7 @@ const TEXT_SECONDARY = "#b0b0b0";
 const TABS = ["Suggested", "Songs", "Artists", "Albums", "Folder"];
 
 export function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState(0);
   const searchQuery = useMusicStore((state) => state.searchQuery);
   const searchResults = useMusicStore((state) => state.searchResults);
@@ -57,6 +59,11 @@ export function HomeScreen() {
   const toggleLike = useMusicStore((state) => state.toggleLike);
   const isLiked = useMusicStore((state) => state.isLiked);
 
+  // Artists tab state
+  const artistsList = useMusicStore((state) => state.artistsList);
+  const isLoadingArtists = useMusicStore((state) => state.isLoadingArtists);
+  const loadArtistsTab = useMusicStore((state) => state.loadArtistsTab);
+
   const { playTrack } = usePlayer();
 
   // Load suggestions when Suggested tab is focused
@@ -64,8 +71,10 @@ export function HomeScreen() {
     useCallback(() => {
       if (activeTab === 0) {
         void loadSuggestedTab();
+      } else if (activeTab === 2) {
+        void loadArtistsTab();
       }
-    }, [activeTab, loadSuggestedTab]),
+    }, [activeTab, loadSuggestedTab, loadArtistsTab]),
   );
 
   const handlePlayTrack = async (track: any) => {
@@ -77,7 +86,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         {/* Logo & Search */}
         <View style={styles.topBar}>
           <View style={styles.logoSection}>
@@ -279,8 +288,52 @@ export function HomeScreen() {
           </>
         )}
 
+        {/* Artists Tab - Random Artists List */}
+        {activeTab === 2 && (
+          <>
+            {isLoadingArtists && artistsList.length === 0 && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={ACCENT_COLOR} />
+              </View>
+            )}
+
+            {artistsList.length === 0 && !isLoadingArtists && (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="person-outline" size={64} color={TEXT_SECONDARY} />
+                <Text style={styles.emptyText}>No artists found</Text>
+                <Text style={styles.emptySubtext}>
+                  Try refreshing the Artists tab
+                </Text>
+              </View>
+            )}
+
+            {artistsList.length > 0 && (
+              <View style={styles.artistsGridContainer}>
+                <FlatList
+                  data={artistsList}
+                  keyExtractor={(item, idx) => `${item.id}-artist-${idx}`}
+                  numColumns={2}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.gridRow}
+                  renderItem={({ item }) => (
+                    <Pressable style={styles.artistGridCard}>
+                      <Image
+                        source={{ uri: item.image }}
+                        style={styles.artistGridImage}
+                      />
+                      <Text numberOfLines={2} style={styles.artistGridName}>
+                        {item.name}
+                      </Text>
+                    </Pressable>
+                  )}
+                />
+              </View>
+            )}
+          </>
+        )}
+
         {/* Other Tabs - Search Results */}
-        {activeTab !== 0 && activeTab !== 1 && (
+        {activeTab !== 0 && activeTab !== 1 && activeTab !== 2 && (
           <>
             {/* Search Bar */}
             <View style={styles.searchRow}>
@@ -603,6 +656,26 @@ const styles = StyleSheet.create({
     color: TEXT_SECONDARY,
     marginTop: 8,
     textAlign: "center",
+  },
+  // Artists grid styles
+  artistsGridContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  artistGridCard: {
+    width: "48%",
+  },
+  artistGridImage: {
+    width: "100%",
+    height: 160,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  artistGridName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: TEXT_PRIMARY,
+    marginBottom: 4,
   },
   bottomSpacer: {
     height: 100,

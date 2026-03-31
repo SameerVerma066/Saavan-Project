@@ -53,6 +53,36 @@ export type SearchSongsResult = {
   hasMore: boolean;
 };
 
+type SaavnSearchArtist = {
+  id?: string;
+  name?: string;
+  image?: SaavnSongImage[];
+  url?: string;
+};
+
+type SearchArtistsResponse = {
+  status?: string;
+  data?: {
+    results?: SaavnSearchArtist[];
+    total?: number;
+    start?: number;
+  };
+};
+
+export type Artist = {
+  id: string;
+  name: string;
+  image: string;
+  url: string;
+};
+
+export type SearchArtistsResult = {
+  artists: Artist[];
+  page: number;
+  total: number;
+  hasMore: boolean;
+};
+
 function getPreferredDownloadUrl(downloadUrls: SaavnSongDownloadUrl[]) {
   const mapped = downloadUrls
     .map((item) => ({
@@ -238,6 +268,89 @@ export async function getRandomArtists(limit: number = 3): Promise<Track[]> {
     return artists.slice(0, limit);
   } catch (error) {
     console.error("Failed to get random artists:", error);
+    return [];
+  }
+}
+
+// Search artists from the API
+export async function searchArtists(params: {
+  query: string;
+  page: number;
+  limit: number;
+}): Promise<SearchArtistsResult> {
+  const query =
+    params.query.trim().length > 0 ? params.query.trim() : "popular";
+  const page = Math.max(1, params.page);
+  const limit = Math.max(1, params.limit);
+
+  const url = `${BASE_URL}/api/search/artists?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Search Artists API failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as SearchArtistsResponse;
+    const results = payload.data?.results ?? [];
+    
+    const artists = results
+      .map((artist) => ({
+        id: artist.id ?? "",
+        name: artist.name ?? "Unknown Artist",
+        image: artist.image?.[0]?.url ?? artist.image?.[0]?.link ?? "https://picsum.photos/500",
+        url: artist.url ?? "",
+      }))
+      .filter((artist) => artist.id.length > 0);
+
+    const total = payload.data?.total ?? 0;
+    const hasMore = page * limit < total;
+
+    return {
+      artists,
+      page,
+      total,
+      hasMore,
+    };
+  } catch (error) {
+    console.error("Failed to search artists:", error);
+    return {
+      artists: [],
+      page,
+      total: 0,
+      hasMore: false,
+    };
+  }
+}
+
+// Get random artists from API
+export async function getRandomArtistsFromAPI(limit: number = 6): Promise<Artist[]> {
+  const artistQueries = [
+    "arijit singh",
+    "taylor swift",
+    "ed sheeran",
+    "the weeknd",
+    "ariana grande",
+    "bad bunny",
+    "travis scott",
+    "billie eilish",
+    "Drake",
+  ];
+  const randomQuery =
+    artistQueries[Math.floor(Math.random() * artistQueries.length)];
+
+  try {
+    const result = await searchArtists({
+      query: randomQuery,
+      page: 1,
+      limit: Math.max(6, limit),
+    });
+
+    // Shuffle and return limited results
+    const shuffled = [...result.artists].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, limit);
+  } catch (error) {
+    console.error("Failed to get random artists from API:", error);
     return [];
   }
 }

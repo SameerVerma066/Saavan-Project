@@ -4,10 +4,12 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import {
     getRandomArtists,
+    getRandomArtistsFromAPI,
     getRandomSongs,
     searchSongs,
 } from "@/services/saavn-api";
 import type { Track } from "@/types/track";
+import type { Artist } from "@/services/saavn-api";
 
 type RepeatMode = "off" | "one" | "all";
 
@@ -34,6 +36,10 @@ type MusicState = {
   suggestionsError: string | null;
   // Liked songs state
   likedSongs: Track[];
+  // Artists tab state
+  artistsList: Artist[];
+  isLoadingArtists: boolean;
+  artistsError: string | null;
   // Methods
   setSearchQuery: (query: string) => void;
   loadInitialSongs: () => Promise<void>;
@@ -56,6 +62,8 @@ type MusicState = {
   toggleLike: (track: Track) => void;
   isLiked: (trackId: string) => boolean;
   removeLike: (trackId: string) => void;
+  // Artists tab methods
+  loadArtistsTab: () => Promise<void>;
 };
 
 const SEARCH_PAGE_LIMIT = 20;
@@ -101,6 +109,10 @@ export const useMusicStore = create<MusicState>()(
       suggestionsError: null,
       // Liked songs state
       likedSongs: [],
+      // Artists tab state
+      artistsList: [],
+      isLoadingArtists: false,
+      artistsError: null,
 
       setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -437,6 +449,25 @@ export const useMusicStore = create<MusicState>()(
         set((state) => ({
           likedSongs: state.likedSongs.filter((item) => item.id !== trackId),
         }));
+      },
+
+      loadArtistsTab: async () => {
+        set({ isLoadingArtists: true, artistsError: null });
+
+        try {
+          const artists = await getRandomArtistsFromAPI(6);
+          set({
+            artistsList: artists,
+            isLoadingArtists: false,
+            artistsError: null,
+          });
+        } catch (error) {
+          set({
+            isLoadingArtists: false,
+            artistsError:
+              error instanceof Error ? error.message : "Failed to load artists",
+          });
+        }
       },
     }),
     {
