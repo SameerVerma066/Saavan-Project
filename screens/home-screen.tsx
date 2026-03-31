@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -38,12 +40,35 @@ export function HomeScreen() {
   const playSearchTrackNow = useMusicStore((state) => state.playSearchTrackNow);
   const addTrackToQueue = useMusicStore((state) => state.addTrackToQueue);
 
-  const { playTrack, queue } = usePlayer();
+  // Suggested tab state
+  const recentlyPlayed = useMusicStore((state) => state.recentlyPlayed);
+  const randomSongs = useMusicStore((state) => state.randomSongs);
+  const randomArtists = useMusicStore((state) => state.randomArtists);
+  const isLoadingSuggestions = useMusicStore(
+    (state) => state.isLoadingSuggestions,
+  );
+  const loadSuggestedTab = useMusicStore((state) => state.loadSuggestedTab);
+  const addToRecentlyPlayed = useMusicStore(
+    (state) => state.addToRecentlyPlayed,
+  );
 
-  // Get different sections
-  const recentlyPlayed = searchResults.slice(0, 6);
-  const artists = searchResults.slice(0, 3);
-  const mostPlayed = searchResults.slice(0, 6);
+  const { playTrack } = usePlayer();
+
+  // Load suggestions when Suggested tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTab === 0) {
+        void loadSuggestedTab();
+      }
+    }, [activeTab, loadSuggestedTab]),
+  );
+
+  const handlePlayTrack = async (track: any) => {
+    playSearchTrackNow(track);
+    addToRecentlyPlayed(track);
+    const state = useMusicStore.getState();
+    await playTrack(state.currentIndex);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -87,142 +112,183 @@ export function HomeScreen() {
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search Bar */}
-        <View style={styles.searchRow}>
-          <Ionicons
-            name="search"
-            size={18}
-            color={TEXT_SECONDARY}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search songs..."
-            placeholderTextColor={TEXT_SECONDARY}
-            style={styles.input}
-            onSubmitEditing={() => void loadInitialSongs()}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery("")}>
-              <Ionicons name="close" size={18} color={TEXT_SECONDARY} />
-            </Pressable>
-          )}
-        </View>
-
-        {/* Recently Played Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recently Played</Text>
-            <Pressable>
-              <Text style={styles.seeAll}>See All</Text>
-            </Pressable>
-          </View>
-          <FlatList
-            data={recentlyPlayed}
-            keyExtractor={(item, idx) => `${item.id}-recent-${idx}`}
-            numColumns={2}
-            scrollEnabled={false}
-            columnWrapperStyle={styles.gridRow}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.gridCard}
-                onPress={async () => {
-                  playSearchTrackNow(item);
-                  const state = useMusicStore.getState();
-                  await playTrack(state.currentIndex);
-                }}
-              >
-                <Image
-                  source={{ uri: item.artwork }}
-                  style={styles.gridImage}
-                />
-                <Text numberOfLines={2} style={styles.gridTitle}>
-                  {item.title}
-                </Text>
-                <Text numberOfLines={1} style={styles.gridArtist}>
-                  {item.artist}
-                </Text>
-              </Pressable>
+        {/* Suggested Tab */}
+        {activeTab === 0 && (
+          <>
+            {/* Loading State */}
+            {isLoadingSuggestions && randomSongs.length === 0 && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={ACCENT_COLOR} />
+              </View>
             )}
-          />
-        </View>
 
-        {/* Artists Section */}
-        {artists.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Artists</Text>
-              <Pressable>
-                <Text style={styles.seeAll}>See All</Text>
-              </Pressable>
-            </View>
-            <FlatList
-              data={artists}
-              keyExtractor={(item, idx) => `${item.id}-artist-${idx}`}
-              numColumns={3}
-              scrollEnabled={false}
-              columnWrapperStyle={styles.artistRow}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={styles.artistCard}
-                  onPress={async () => {
-                    playSearchTrackNow(item);
-                    const state = useMusicStore.getState();
-                    await playTrack(state.currentIndex);
-                  }}
-                >
-                  <Image
-                    source={{ uri: item.artwork }}
-                    style={styles.artistImage}
-                  />
-                  <Text numberOfLines={1} style={styles.artistName}>
-                    {item.artist}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          </View>
+            {/* Recently Played Section - Only show if exists */}
+            {recentlyPlayed.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Recently Played</Text>
+                </View>
+                <FlatList
+                  data={recentlyPlayed.slice(0, 6)}
+                  keyExtractor={(item, idx) => `${item.id}-recent-${idx}`}
+                  numColumns={2}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.gridRow}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.gridCard}
+                      onPress={() => handlePlayTrack(item)}
+                    >
+                      <Image
+                        source={{ uri: item.artwork }}
+                        style={styles.gridImage}
+                      />
+                      <Text numberOfLines={2} style={styles.gridTitle}>
+                        {item.title}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.gridArtist}>
+                        {item.artist}
+                      </Text>
+                    </Pressable>
+                  )}
+                />
+              </View>
+            )}
+
+            {/* Artists Section - Circular images like screenshot */}
+            {randomArtists.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Artists</Text>
+                </View>
+                <View style={styles.artistsHorizontalContainer}>
+                  {randomArtists.map((item, idx) => (
+                    <Pressable
+                      key={`${item.id}-artist-${idx}`}
+                      style={styles.artistCardCircular}
+                      onPress={() => handlePlayTrack(item)}
+                    >
+                      <Image
+                        source={{ uri: item.artwork }}
+                        style={styles.artistImageCircular}
+                      />
+                      <Text numberOfLines={2} style={styles.artistNameCircular}>
+                        {item.artist}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Random Songs Section */}
+            {randomSongs.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Suggested For You</Text>
+                </View>
+                <FlatList
+                  data={randomSongs}
+                  keyExtractor={(item, idx) => `${item.id}-random-${idx}`}
+                  numColumns={2}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.gridRow}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.gridCard}
+                      onPress={() => handlePlayTrack(item)}
+                    >
+                      <Image
+                        source={{ uri: item.artwork }}
+                        style={styles.gridImage}
+                      />
+                      <Text numberOfLines={2} style={styles.gridTitle}>
+                        {item.title}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.gridArtist}>
+                        {item.artist}
+                      </Text>
+                    </Pressable>
+                  )}
+                />
+              </View>
+            )}
+          </>
         )}
 
-        {/* Most Played Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Most Played</Text>
-            <Pressable>
-              <Text style={styles.seeAll}>See All</Text>
-            </Pressable>
-          </View>
-          <FlatList
-            data={mostPlayed}
-            keyExtractor={(item, idx) => `${item.id}-most-${idx}`}
-            numColumns={2}
-            scrollEnabled={false}
-            columnWrapperStyle={styles.gridRow}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.gridCard}
-                onPress={async () => {
-                  playSearchTrackNow(item);
-                  const state = useMusicStore.getState();
-                  await playTrack(state.currentIndex);
-                }}
-              >
-                <Image
-                  source={{ uri: item.artwork }}
-                  style={styles.gridImage}
+        {/* Other Tabs - Search Results */}
+        {activeTab !== 0 && (
+          <>
+            {/* Search Bar */}
+            <View style={styles.searchRow}>
+              <Ionicons
+                name="search"
+                size={18}
+                color={TEXT_SECONDARY}
+                style={styles.searchIcon}
+              />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search songs..."
+                placeholderTextColor={TEXT_SECONDARY}
+                style={styles.input}
+                onSubmitEditing={() => void loadInitialSongs()}
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close" size={18} color={TEXT_SECONDARY} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <View style={styles.section}>
+                <FlatList
+                  data={searchResults}
+                  keyExtractor={(item, idx) => `${item.id}-search-${idx}`}
+                  numColumns={2}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.gridRow}
+                  onEndReached={() => void loadMoreSongs()}
+                  onEndReachedThreshold={0.3}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.gridCard}
+                      onPress={() => handlePlayTrack(item)}
+                    >
+                      <Image
+                        source={{ uri: item.artwork }}
+                        style={styles.gridImage}
+                      />
+                      <Text numberOfLines={2} style={styles.gridTitle}>
+                        {item.title}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.gridArtist}>
+                        {item.artist}
+                      </Text>
+                    </Pressable>
+                  )}
                 />
-                <Text numberOfLines={2} style={styles.gridTitle}>
-                  {item.title}
-                </Text>
-                <Text numberOfLines={1} style={styles.gridArtist}>
-                  {item.artist}
-                </Text>
-              </Pressable>
+                {isLoadingSearch && (
+                  <ActivityIndicator
+                    size="large"
+                    color={ACCENT_COLOR}
+                    style={styles.loader}
+                  />
+                )}
+              </View>
             )}
-          />
-        </View>
+
+            {searchError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{searchError}</Text>
+              </View>
+            )}
+          </>
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -366,6 +432,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: TEXT_PRIMARY,
+    textAlign: "center",
+  },
+  // New styles for circular artist layout
+  artistsHorizontalContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-start",
+    marginBottom: 24,
+    paddingHorizontal: 0,
+  },
+  artistCardCircular: {
+    flex: 1,
+    alignItems: "center",
+    marginHorizontal: 8,
+  },
+  artistImageCircular: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 12,
+  },
+  artistNameCircular: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: TEXT_PRIMARY,
+    textAlign: "center",
+    width: "100%",
+  },
+  // Loading and error states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 400,
+  },
+  loader: {
+    marginVertical: 20,
+  },
+  errorContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: SECONDARY_BG,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  errorText: {
+    color: "#FF6B6B",
+    fontSize: 14,
     textAlign: "center",
   },
   bottomSpacer: {

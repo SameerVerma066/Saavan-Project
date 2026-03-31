@@ -177,3 +177,67 @@ export async function searchSongs(params: {
     hasMore,
   };
 }
+
+// Get random songs from popular queries
+export async function getRandomSongs(limit: number = 6): Promise<Track[]> {
+  const queries = [
+    "trending",
+    "top songs",
+    "popular",
+    "bollywood",
+    "arijit singh",
+    "indie",
+  ];
+  const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+
+  try {
+    const result = await searchSongs({
+      query: randomQuery,
+      page: 1,
+      limit: Math.max(6, limit),
+    });
+
+    // Shuffle and return limited results
+    const shuffled = [...result.tracks].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, limit);
+  } catch (error) {
+    console.error("Failed to get random songs:", error);
+    return [];
+  }
+}
+
+// Get random artists from popular queries
+export async function getRandomArtists(limit: number = 3): Promise<Track[]> {
+  const artistQueries = [
+    "arijit singh",
+    "taylor swift",
+    "ed sheeran",
+    "the weeknd",
+    "ariana grande",
+    "bad bunny",
+  ];
+  const randomQuery =
+    artistQueries[Math.floor(Math.random() * artistQueries.length)];
+
+  try {
+    const result = await searchSongs({
+      query: randomQuery,
+      page: 1,
+      limit: Math.max(3, limit),
+    });
+
+    // Return unique artists based on artist name
+    const uniqueArtists: Record<string, Track> = {};
+    for (const track of result.tracks) {
+      if (!uniqueArtists[track.artist]) {
+        uniqueArtists[track.artist] = track;
+      }
+    }
+
+    const artists = Object.values(uniqueArtists);
+    return artists.slice(0, limit);
+  } catch (error) {
+    console.error("Failed to get random artists:", error);
+    return [];
+  }
+}

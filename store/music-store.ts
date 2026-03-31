@@ -2,7 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { searchSongs } from "@/services/saavn-api";
+import {
+    getRandomArtists,
+    getRandomSongs,
+    searchSongs,
+} from "@/services/saavn-api";
 import type { Track } from "@/types/track";
 
 type RepeatMode = "off" | "one" | "all";
@@ -22,6 +26,13 @@ type MusicState = {
   durationMillis: number;
   shuffleEnabled: boolean;
   repeatMode: RepeatMode;
+  // Suggested tab state
+  recentlyPlayed: Track[];
+  randomSongs: Track[];
+  randomArtists: Track[];
+  isLoadingSuggestions: boolean;
+  suggestionsError: string | null;
+  // Methods
   setSearchQuery: (query: string) => void;
   loadInitialSongs: () => Promise<void>;
   loadMoreSongs: () => Promise<void>;
@@ -36,6 +47,9 @@ type MusicState = {
   toggleShuffle: () => void;
   cycleRepeatMode: () => void;
   sanitizeQueue: () => void;
+  // Suggested tab methods
+  loadSuggestedTab: () => Promise<void>;
+  addToRecentlyPlayed: (track: Track) => void;
 };
 
 const SEARCH_PAGE_LIMIT = 20;
@@ -73,6 +87,12 @@ export const useMusicStore = create<MusicState>()(
       durationMillis: 0,
       shuffleEnabled: false,
       repeatMode: "off",
+      // Suggested tab state
+      recentlyPlayed: [],
+      randomSongs: [],
+      randomArtists: [],
+      isLoadingSuggestions: false,
+      suggestionsError: null,
 
       setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -339,6 +359,47 @@ export const useMusicStore = create<MusicState>()(
           };
         });
       },
+
+      loadSuggestedTab: async () => {
+        set({ isLoadingSuggestions: true, suggestionsError: null });
+
+        try {
+          const [suggestions, artists] = await Promise.all([
+            getRandomSongs(6),
+            getRandomArtists(3),
+          ]);
+
+          set({
+            randomSongs: suggestions,
+            randomArtists: artists,
+            isLoadingSuggestions: false,
+            suggestionsError: null,
+          });
+        } catch (error) {
+          set({
+            isLoadingSuggestions: false,
+            suggestionsError:
+              error instanceof Error
+                ? error.message
+                : "Failed to load suggestions",
+          });
+        }
+      },
+
+      addToRecentlyPlayed: (track) => {
+        set((state) => {
+          // Remove if already exists, then add to front
+          const filtered = state.recentlyPlayed.filter(
+            (item) => item.id !== track.id,
+          );
+          const updated = [track, ...filtered];
+
+          // Keep only last 10 recently played tracks
+          return {
+            recentlyPlayed: updated.slice(0, 10),
+          };
+        });
+      },
     }),
     {
       name: "music-store-v1",
@@ -348,6 +409,7 @@ export const useMusicStore = create<MusicState>()(
         currentIndex: state.currentIndex,
         shuffleEnabled: state.shuffleEnabled,
         repeatMode: state.repeatMode,
+        recentlyPlayed: state.recentlyPlayed,
       }),
     },
   ),

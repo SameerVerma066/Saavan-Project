@@ -147,6 +147,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         soundRef.current = sound;
         useMusicStore.getState().setCurrentIndex(index);
 
+        // Track as recently played
+        useMusicStore.getState().addToRecentlyPlayed(track);
+
         if (status.isLoaded) {
           useMusicStore.getState().setPlaybackState(status.isPlaying);
           useMusicStore
