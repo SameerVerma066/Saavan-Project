@@ -2,12 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePlayer } from "@/context/player-context";
 import { formatMillis } from "@/utils/time";
 
 export function MiniPlayer() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     currentTrack,
     isPlaying,
@@ -20,8 +22,13 @@ export function MiniPlayer() {
     return null;
   }
 
+  const tabBarHeight = 62 + Math.max(insets.bottom, 8);
+
   return (
-    <Pressable onPress={() => router.push("/player")} style={styles.container}>
+    <Pressable
+      onPress={() => router.push("/player")}
+      style={[styles.container, { bottom: tabBarHeight + 8 }]}
+    >
       <Image source={{ uri: currentTrack.artwork }} style={styles.artwork} />
 
       <View style={styles.center}>
@@ -54,7 +61,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    bottom: 66,
+    bottom: 72,
     zIndex: 20,
     borderRadius: 16,
     backgroundColor: "#0f172a",

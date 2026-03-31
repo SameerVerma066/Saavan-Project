@@ -23,9 +23,12 @@ type SaavnArtist = {
 type SaavnSearchSong = {
   id: string;
   name?: string;
+  subtitle?: string;
   primaryArtists?: string | SaavnArtist[];
   artists?: {
     primary?: SaavnArtist[];
+    all?: SaavnArtist[];
+    featured?: SaavnArtist[];
   };
   album?: {
     name?: string;
@@ -48,6 +51,36 @@ type SearchSongsResponse = {
 
 export type SearchSongsResult = {
   tracks: Track[];
+  page: number;
+  total: number;
+  hasMore: boolean;
+};
+
+type SaavnSearchArtist = {
+  id?: string;
+  name?: string;
+  image?: SaavnSongImage[];
+  url?: string;
+};
+
+type SearchArtistsResponse = {
+  status?: string;
+  data?: {
+    results?: SaavnSearchArtist[];
+    total?: number;
+    start?: number;
+  };
+};
+
+export type Artist = {
+  id: string;
+  name: string;
+  image: string;
+  url: string;
+};
+
+export type SearchArtistsResult = {
+  artists: Artist[];
   page: number;
   total: number;
   hasMore: boolean;
@@ -87,30 +120,85 @@ function getBestArtwork(images: SaavnSongImage[]) {
   return images[0]?.url ?? images[0]?.link ?? "https://picsum.photos/500";
 }
 
-function getArtistName(song: SaavnSearchSong) {
-  if (typeof song.primaryArtists === "string") {
-    const trimmed = song.primaryArtists.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
-    }
-  }
+function getArtistName(song: SaavnSearchSong): string {
+  try {
+    const invalidNames = new Set([
+      "unknown",
+      "unknown artist",
+      "various artists",
+    ]);
 
-  if (Array.isArray(song.primaryArtists)) {
-    const names = song.primaryArtists
-      .map((artist) => artist.name?.trim() ?? "")
+    const normalizeCandidate = (value?: string) => {
+      const cleaned = (value ?? "").replace(/&amp;/g, "&").trim();
+      if (!cleaned) {
+        return "";
+      }
+
+      const lower = cleaned.toLowerCase();
+      if (invalidNames.has(lower)) {
+        return "";
+      }
+
+      return cleaned;
+    };
+
+    // Try primaryArtists as string first
+    if (typeof song.primaryArtists === "string") {
+      const trimmed = normalizeCandidate(song.primaryArtists);
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+
+    // Try primaryArtists as array
+    if (Array.isArray(song.primaryArtists)) {
+      const names = song.primaryArtists
+        .map((artist) => {
+          if (!artist) return "";
+          const name = typeof artist === "string" ? artist : artist.name;
+          return normalizeCandidate(name);
+        })
+        .filter((name) => name.length > 0);
+
+      if (names.length > 0) {
+        return names.join(", ");
+      }
+    }
+
+    // Try artists.primary array
+    const primaryFromArtists = (song.artists?.primary ?? [])
+      .map((artist) => normalizeCandidate(artist?.name))
       .filter((name) => name.length > 0);
 
-    if (names.length > 0) {
-      return names.join(", ");
+    if (primaryFromArtists.length > 0) {
+      return primaryFromArtists.join(", ");
     }
-  }
 
-  const primaryFromArtists = (song.artists?.primary ?? [])
-    .map((artist) => artist.name?.trim() ?? "")
-    .filter((name) => name.length > 0);
+    // Try artists.all array
+    const allArtists = (song.artists?.all ?? [])
+      .map((artist) => normalizeCandidate(artist?.name))
+      .filter((name) => name.length > 0);
 
-  if (primaryFromArtists.length > 0) {
-    return primaryFromArtists.join(", ");
+    if (allArtists.length > 0) {
+      return allArtists.join(", ");
+    }
+
+    // Try artists.featured array
+    const featuredArtists = (song.artists?.featured ?? [])
+      .map((artist) => normalizeCandidate(artist?.name))
+      .filter((name) => name.length > 0);
+
+    if (featuredArtists.length > 0) {
+      return featuredArtists.join(", ");
+    }
+
+    // Fallback from subtitle field
+    const subtitle = normalizeCandidate(song.subtitle);
+    if (subtitle.length > 0) {
+      return subtitle;
+    }
+  } catch (error) {
+    // Silently handle any parsing errors
   }
 
   return "Unknown Artist";
@@ -165,4 +253,158 @@ export async function searchSongs(params: {
     total,
     hasMore,
   };
+}
+
+// Get random songs from popular queries
+export async function getRandomSongs(limit: number = 6): Promise<Track[]> {
+  const queries = [
+    "trending",
+    "top songs",
+    "popular",
+    "bollywood",
+    "arijit singh",
+    "indie",
+  ];
+  const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+
+  try {
+    const result = await searchSongs({
+      query: randomQuery,
+      page: 1,
+      limit: Math.max(6, limit),
+    });
+
+    // Shuffle and return limited results
+    const shuffled = [...result.tracks].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, limit);
+  } catch (error) {
+    console.error("Failed to get random songs:", error);
+    return [];
+  }
+}
+
+// Get random artists from popular queries
+export async function getRandomArtists(limit: number = 3): Promise<Track[]> {
+  const artistQueries = [
+    "arijit singh",
+    "taylor swift",
+    "ed sheeran",
+    "the weeknd",
+    "ariana grande",
+    "bad bunny",
+  ];
+  const randomQuery =
+    artistQueries[Math.floor(Math.random() * artistQueries.length)];
+
+  try {
+    const result = await searchSongs({
+      query: randomQuery,
+      page: 1,
+      limit: Math.max(3, limit),
+    });
+
+    // Return unique artists based on artist name
+    const uniqueArtists: Record<string, Track> = {};
+    for (const track of result.tracks) {
+      if (!uniqueArtists[track.artist]) {
+        uniqueArtists[track.artist] = track;
+      }
+    }
+
+    const artists = Object.values(uniqueArtists);
+    return artists.slice(0, limit);
+  } catch (error) {
+    console.error("Failed to get random artists:", error);
+    return [];
+  }
+}
+
+// Search artists from the API
+export async function searchArtists(params: {
+  query: string;
+  page: number;
+  limit: number;
+}): Promise<SearchArtistsResult> {
+  const query =
+    params.query.trim().length > 0 ? params.query.trim() : "popular";
+  const page = Math.max(1, params.page);
+  const limit = Math.max(1, params.limit);
+
+  const url = `${BASE_URL}/api/search/artists?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `Search Artists API failed with status ${response.status}`,
+      );
+    }
+
+    const payload = (await response.json()) as SearchArtistsResponse;
+    const results = payload.data?.results ?? [];
+
+    const artists = results
+      .map((artist) => ({
+        id: artist.id ?? "",
+        name: artist.name ?? "Unknown Artist",
+        image:
+          artist.image?.[0]?.url ??
+          artist.image?.[0]?.link ??
+          "https://picsum.photos/500",
+        url: artist.url ?? "",
+      }))
+      .filter((artist) => artist.id.length > 0);
+
+    const total = payload.data?.total ?? 0;
+    const hasMore = page * limit < total;
+
+    return {
+      artists,
+      page,
+      total,
+      hasMore,
+    };
+  } catch (error) {
+    console.error("Failed to search artists:", error);
+    return {
+      artists: [],
+      page,
+      total: 0,
+      hasMore: false,
+    };
+  }
+}
+
+// Get random artists from API
+export async function getRandomArtistsFromAPI(
+  limit: number = 6,
+): Promise<Artist[]> {
+  const artistQueries = [
+    "arijit singh",
+    "taylor swift",
+    "ed sheeran",
+    "the weeknd",
+    "ariana grande",
+    "bad bunny",
+    "travis scott",
+    "billie eilish",
+    "Drake",
+  ];
+  const randomQuery =
+    artistQueries[Math.floor(Math.random() * artistQueries.length)];
+
+  try {
+    const result = await searchArtists({
+      query: randomQuery,
+      page: 1,
+      limit: Math.max(6, limit),
+    });
+
+    // Shuffle and return limited results
+    const shuffled = [...result.artists].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, limit);
+  } catch (error) {
+    console.error("Failed to get random artists from API:", error);
+    return [];
+  }
 }

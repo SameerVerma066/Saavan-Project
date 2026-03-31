@@ -1,14 +1,14 @@
 import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function PlaylistsTab() {
+export default function SettingsTab() {
   const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.content, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Text style={styles.title}>Playlists</Text>
-        <Text style={styles.subtitle}>Playlist screen coming soon.</Text>
+        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.subtitle}>Settings screen coming soon.</Text>
       </View>
     </SafeAreaView>
   );

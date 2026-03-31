@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 
 import { usePlayer } from "@/context/player-context";
+import { useMusicStore } from "@/store/music-store";
 import { formatMillis } from "@/utils/time";
 
 export function PlayerScreen() {
@@ -21,6 +22,9 @@ export function PlayerScreen() {
     toggleShuffle,
     cycleRepeatMode,
   } = usePlayer();
+
+  const toggleLike = useMusicStore((state) => state.toggleLike);
+  const isLiked = useMusicStore((state) => state.isLiked);
 
   const [progressWidth, setProgressWidth] = useState(0);
 
@@ -42,6 +46,8 @@ export function PlayerScreen() {
     );
   }
 
+  const liked = isLiked(currentTrack.id);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -50,7 +56,11 @@ export function PlayerScreen() {
         <Image source={{ uri: currentTrack.artwork }} style={styles.artwork} />
 
         <Text style={styles.title}>{currentTrack.title}</Text>
-        <Text style={styles.artist}>{currentTrack.artist}</Text>
+        <Text style={styles.artist}>
+          {currentTrack.artist && currentTrack.artist.trim().length > 0
+            ? currentTrack.artist
+            : "Unknown Artist"}
+        </Text>
 
         <Pressable
           style={styles.progressTrack}
@@ -108,6 +118,19 @@ export function PlayerScreen() {
             <Ionicons name="play-skip-forward" size={24} color="#0f172a" />
           </Pressable>
 
+          <Pressable
+            style={styles.modeBtn}
+            onPress={() => toggleLike(currentTrack)}
+          >
+            <Ionicons
+              name={liked ? "heart" : "heart-outline"}
+              size={19}
+              color={liked ? "#FF6B6B" : "#64748b"}
+            />
+          </Pressable>
+        </View>
+
+        <View style={styles.bottomControlRow}>
           <Pressable style={styles.modeBtn} onPress={cycleRepeatMode}>
             <Text
               style={[
@@ -187,6 +210,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
+  },
+  bottomControlRow: {
+    marginTop: 24,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modeBtn: {
     width: 36,

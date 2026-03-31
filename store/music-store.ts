@@ -2,7 +2,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { searchSongs } from "@/services/saavn-api";
+import type { Artist } from "@/services/saavn-api";
+import {
+    getRandomArtists,
+    getRandomArtistsFromAPI,
+    getRandomSongs,
+    searchSongs,
+} from "@/services/saavn-api";
 import type { Track } from "@/types/track";
 
 type RepeatMode = "off" | "one" | "all";
@@ -22,6 +28,19 @@ type MusicState = {
   durationMillis: number;
   shuffleEnabled: boolean;
   repeatMode: RepeatMode;
+  // Suggested tab state
+  recentlyPlayed: Track[];
+  randomSongs: Track[];
+  randomArtists: Track[];
+  isLoadingSuggestions: boolean;
+  suggestionsError: string | null;
+  // Liked songs state
+  likedSongs: Track[];
+  // Artists tab state
+  artistsList: Artist[];
+  isLoadingArtists: boolean;
+  artistsError: string | null;
+  // Methods
   setSearchQuery: (query: string) => void;
   loadInitialSongs: () => Promise<void>;
   loadMoreSongs: () => Promise<void>;
@@ -36,6 +55,15 @@ type MusicState = {
   toggleShuffle: () => void;
   cycleRepeatMode: () => void;
   sanitizeQueue: () => void;
+  // Suggested tab methods
+  loadSuggestedTab: () => Promise<void>;
+  addToRecentlyPlayed: (track: Track) => void;
+  // Likes methods
+  toggleLike: (track: Track) => void;
+  isLiked: (trackId: string) => boolean;
+  removeLike: (trackId: string) => void;
+  // Artists tab methods
+  loadArtistsTab: () => Promise<void>;
 };
 
 const SEARCH_PAGE_LIMIT = 20;
@@ -59,7 +87,7 @@ function dedupeTracksById(tracks: Track[]) {
 export const useMusicStore = create<MusicState>()(
   persist(
     (set, get) => ({
-      searchQuery: "arijit",
+      searchQuery: "",
       isLoadingSearch: false,
       searchError: null,
       searchResults: [],
@@ -73,6 +101,18 @@ export const useMusicStore = create<MusicState>()(
       durationMillis: 0,
       shuffleEnabled: false,
       repeatMode: "off",
+      // Suggested tab state
+      recentlyPlayed: [],
+      randomSongs: [],
+      randomArtists: [],
+      isLoadingSuggestions: false,
+      suggestionsError: null,
+      // Liked songs state
+      likedSongs: [],
+      // Artists tab state
+      artistsList: [],
+      isLoadingArtists: false,
+      artistsError: null,
 
       setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -299,29 +339,135 @@ export const useMusicStore = create<MusicState>()(
 
       sanitizeQueue: () => {
         set((state) => {
-          if (state.queue.length <= 1) {
+          if (state.queue.length === 0) {
             return state;
           }
 
           const currentTrackId = state.queue[state.currentIndex]?.id;
+
+          // Deduplicate tracks
           const uniqueQueue = dedupeTracksById(state.queue);
 
-          if (uniqueQueue.length === state.queue.length) {
+          // Ensure all tracks have proper artist names
+          const cleanedQueue = uniqueQueue.map((track) => ({
+            ...track,
+            artist:
+              track.artist && track.artist.trim().length > 0
+                ? track.artist
+                : "Unknown Artist",
+          }));
+
+          if (
+            cleanedQueue.length === state.queue.length &&
+            cleanedQueue.every(
+              (track, idx) => track.artist === state.queue[idx]?.artist,
+            )
+          ) {
             return state;
           }
 
           const nextIndex = currentTrackId
-            ? uniqueQueue.findIndex((track) => track.id === currentTrackId)
+            ? cleanedQueue.findIndex((track) => track.id === currentTrackId)
             : -1;
 
           return {
-            queue: uniqueQueue,
+            queue: cleanedQueue,
             currentIndex:
               nextIndex >= 0
                 ? nextIndex
-                : Math.min(state.currentIndex, uniqueQueue.length - 1),
+                : Math.min(state.currentIndex, cleanedQueue.length - 1),
           };
         });
+      },
+
+      loadSuggestedTab: async () => {
+        set({ isLoadingSuggestions: true, suggestionsError: null });
+
+        try {
+          const [suggestions, artists] = await Promise.all([
+            getRandomSongs(6),
+            getRandomArtists(3),
+          ]);
+
+          set({
+            randomSongs: suggestions,
+            randomArtists: artists,
+            isLoadingSuggestions: false,
+            suggestionsError: null,
+          });
+        } catch (error) {
+          set({
+            isLoadingSuggestions: false,
+            suggestionsError:
+              error instanceof Error
+                ? error.message
+                : "Failed to load suggestions",
+          });
+        }
+      },
+
+      addToRecentlyPlayed: (track) => {
+        set((state) => {
+          // Remove if already exists, then add to front
+          const filtered = state.recentlyPlayed.filter(
+            (item) => item.id !== track.id,
+          );
+          const updated = [track, ...filtered];
+
+          // Keep only last 10 recently played tracks
+          return {
+            recentlyPlayed: updated.slice(0, 10),
+          };
+        });
+      },
+
+      toggleLike: (track) => {
+        set((state) => {
+          const isLiked = state.likedSongs.some((item) => item.id === track.id);
+
+          if (isLiked) {
+            // Remove from liked
+            return {
+              likedSongs: state.likedSongs.filter(
+                (item) => item.id !== track.id,
+              ),
+            };
+          } else {
+            // Add to liked
+            return {
+              likedSongs: [track, ...state.likedSongs],
+            };
+          }
+        });
+      },
+
+      isLiked: (trackId) => {
+        return get().likedSongs.some((item) => item.id === trackId);
+      },
+
+      removeLike: (trackId) => {
+        set((state) => ({
+          likedSongs: state.likedSongs.filter((item) => item.id !== trackId),
+        }));
+      },
+
+      loadArtistsTab: async () => {
+        set({ isLoadingArtists: true, artistsError: null });
+
+        try {
+          const artists = await getRandomArtistsFromAPI(6);
+          set({
+            artistsList: artists,
+            isLoadingArtists: false,
+            artistsError: null,
+          });
+        } catch (error) {
+          set({
+            isLoadingArtists: false,
+            artistsError:
+              error instanceof Error ? error.message : "Failed to load artists",
+          });
+        }
       },
     }),
     {
@@ -332,6 +478,8 @@ export const useMusicStore = create<MusicState>()(
         currentIndex: state.currentIndex,
         shuffleEnabled: state.shuffleEnabled,
         repeatMode: state.repeatMode,
+        recentlyPlayed: state.recentlyPlayed,
+        likedSongs: state.likedSongs,
       }),
     },
   ),

@@ -1,11 +1,11 @@
 import { Audio, type AVPlaybackStatus } from "expo-av";
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
 } from "react";
 
 import { useMusicStore } from "@/store/music-store";
@@ -33,7 +33,9 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const soundRef = useRef<Audio.Sound | null>(null);
-  const loadingIndexRef = useRef<number | null>(null);
+  const isTransitioningRef = useRef(false);
+  const playRequestIdRef = useRef(0);
+  const handlingFinishRef = useRef(false);
 
   const queue = useMusicStore((state) => state.queue);
   const currentTrackIndex = useMusicStore((state) => state.currentIndex);
@@ -68,35 +70,48 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       if (status.didJustFinish) {
         void (async () => {
-          const state = useMusicStore.getState();
-          const totalTracks = state.queue.length;
-          if (totalTracks === 0) {
-            state.setPlaybackState(false);
+          if (handlingFinishRef.current) {
             return;
           }
 
-          if (state.repeatMode === "one") {
-            await playTrackAtIndex(state.currentIndex, true, 0);
-            return;
-          }
+          handlingFinishRef.current = true;
 
-          let nextIndex = state.currentIndex + 1;
-          if (state.shuffleEnabled) {
-            nextIndex = Math.floor(Math.random() * totalTracks);
-          }
+          try {
+            const state = useMusicStore.getState();
+            const totalTracks = state.queue.length;
 
-          const isEnd = nextIndex >= totalTracks;
-          if (isEnd && state.repeatMode === "off") {
-            state.setPlaybackState(false);
-            state.setPlaybackPosition(0, state.durationMillis);
-            return;
-          }
+            if (totalTracks === 0) {
+              state.setPlaybackState(false);
+              return;
+            }
 
-          if (isEnd && state.repeatMode === "all") {
-            nextIndex = 0;
-          }
+            if (state.repeatMode === "one") {
+              await playTrackAtIndex(state.currentIndex, true, 0);
+              return;
+            }
 
-          await playTrackAtIndex(nextIndex, true, 0);
+            let nextIndex = state.currentIndex + 1;
+
+            if (state.shuffleEnabled) {
+              nextIndex = Math.floor(Math.random() * totalTracks);
+            }
+
+            const isEnd = nextIndex >= totalTracks;
+
+            if (isEnd) {
+              if (state.repeatMode === "all") {
+                nextIndex = 0;
+                await playTrackAtIndex(nextIndex, true, 0);
+              } else if (state.repeatMode === "off") {
+                nextIndex = Math.floor(Math.random() * totalTracks);
+                await playTrackAtIndex(nextIndex, true, 0);
+              }
+            } else {
+              await playTrackAtIndex(nextIndex, true, 0);
+            }
+          } finally {
+            handlingFinishRef.current = false;
+          }
         })();
       }
     },
@@ -120,15 +135,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (loadingIndexRef.current === index) {
-        return;
-      }
-
-      loadingIndexRef.current = index;
-
-      await unloadCurrentSound();
+      const requestId = ++playRequestIdRef.current;
+      isTransitioningRef.current = true;
 
       try {
+        await unloadCurrentSound();
+
+        // If a newer request started while unloading, stop this request.
+        if (requestId !== playRequestIdRef.current) {
+          return;
+        }
+
         const track = useMusicStore.getState().queue[index];
         if (!track?.streamUrl) {
           return;
@@ -144,8 +161,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           onPlaybackStatusUpdate,
         );
 
+        // If a newer request started while creating the sound, discard this one.
+        if (requestId !== playRequestIdRef.current) {
+          sound.setOnPlaybackStatusUpdate(null);
+          await sound.unloadAsync();
+          return;
+        }
+
         soundRef.current = sound;
         useMusicStore.getState().setCurrentIndex(index);
+        useMusicStore.getState().addToRecentlyPlayed(track);
 
         if (status.isLoaded) {
           useMusicStore.getState().setPlaybackState(status.isPlaying);
@@ -156,8 +181,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               status.durationMillis ?? track.durationMillis,
             );
         }
+      } catch (error) {
+        console.error("Error playing track:", error);
       } finally {
-        loadingIndexRef.current = null;
+        if (requestId === playRequestIdRef.current) {
+          isTransitioningRef.current = false;
+        }
       }
     },
     [onPlaybackStatusUpdate, unloadCurrentSound],
@@ -201,24 +230,55 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [playTrackAtIndex]);
 
   const playNext = useCallback(async () => {
+    if (isTransitioningRef.current) {
+      return;
+    }
+
     const state = useMusicStore.getState();
     if (state.queue.length === 0) {
       return;
     }
 
-    const nextIndex = (state.currentIndex + 1) % state.queue.length;
-    await playTrackAtIndex(nextIndex, true, 0);
+    isTransitioningRef.current = true;
+    try {
+      let nextIndex = state.currentIndex + 1;
+
+      if (nextIndex >= state.queue.length) {
+        if (state.repeatMode === "all") {
+          nextIndex = 0;
+        } else {
+          nextIndex = Math.floor(Math.random() * state.queue.length);
+        }
+      }
+
+      await playTrackAtIndex(nextIndex, true, 0);
+    } finally {
+      isTransitioningRef.current = false;
+    }
   }, [playTrackAtIndex]);
 
   const playPrevious = useCallback(async () => {
+    if (isTransitioningRef.current) {
+      return;
+    }
+
     const state = useMusicStore.getState();
     if (state.queue.length === 0) {
       return;
     }
 
-    const prevIndex =
-      (state.currentIndex - 1 + state.queue.length) % state.queue.length;
-    await playTrackAtIndex(prevIndex, true, 0);
+    isTransitioningRef.current = true;
+    try {
+      let prevIndex = state.currentIndex - 1;
+
+      if (prevIndex < 0) {
+        prevIndex = state.queue.length - 1;
+      }
+
+      await playTrackAtIndex(prevIndex, true, 0);
+    } finally {
+      isTransitioningRef.current = false;
+    }
   }, [playTrackAtIndex]);
 
   const seekTo = useCallback(async (millis: number) => {
