@@ -8,6 +8,11 @@ import React, {
   useRef,
 } from "react";
 
+import {
+  clearNowPlayingNotification,
+  requestNotificationPermissions,
+  updateNowPlayingNotification,
+} from "@/services/now-playing-notification";
 import { useMusicStore } from "@/store/music-store";
 import type { Track } from "@/types/track";
 
@@ -59,6 +64,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (status: AVPlaybackStatus) => {
       if (!status.isLoaded) {
         setPlaybackState(false);
+        void clearNowPlayingNotification();
         return;
       }
 
@@ -180,6 +186,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               status.positionMillis ?? 0,
               status.durationMillis ?? track.durationMillis,
             );
+          void updateNowPlayingNotification(track, status.isPlaying);
         }
       } catch (error) {
         console.error("Error playing track:", error);
@@ -224,8 +231,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     if (status.isPlaying) {
       await sound.pauseAsync();
+      const pausedTrack = useMusicStore.getState().queue[state.currentIndex];
+      if (pausedTrack) {
+        void updateNowPlayingNotification(pausedTrack, false);
+      }
     } else {
       await sound.playAsync();
+      const resumedTrack = useMusicStore.getState().queue[state.currentIndex];
+      if (resumedTrack) {
+        void updateNowPlayingNotification(resumedTrack, true);
+      }
     }
   }, [playTrackAtIndex]);
 
@@ -319,6 +334,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     sanitizeQueue();
 
+    void requestNotificationPermissions();
+
     void Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
@@ -328,12 +345,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      void clearNowPlayingNotification();
       void unloadCurrentSound();
     };
   }, [sanitizeQueue, unloadCurrentSound]);
 
   useEffect(() => {
     if (queue.length === 0 || currentTrackIndex < 0) {
+      void clearNowPlayingNotification();
       void unloadCurrentSound();
       return;
     }
