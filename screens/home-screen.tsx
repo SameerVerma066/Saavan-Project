@@ -1,15 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Modal,
   Pressable,
   SafeAreaView,
-  Share,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -34,6 +36,12 @@ const TABS = ["Suggested", "Songs", "Artists", "Albums", "Folder"];
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState(0);
+  const [tabLayouts, setTabLayouts] = useState<
+    Record<number, { x: number; width: number }>
+  >({});
+  const tabProgress = useRef(new Animated.Value(0)).current;
+  const tabIndicatorX = useRef(new Animated.Value(0)).current;
+  const tabIndicatorWidth = useRef(new Animated.Value(0)).current;
   const searchQuery = useMusicStore((state) => state.searchQuery);
   const searchResults = useMusicStore((state) => state.searchResults);
   const isLoadingSearch = useMusicStore((state) => state.isLoadingSearch);
@@ -77,6 +85,41 @@ export function HomeScreen() {
 
   const { playTrack } = usePlayer();
 
+  useEffect(() => {
+    Animated.timing(tabProgress, {
+      toValue: activeTab,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+
+    const layout = tabLayouts[activeTab];
+    if (!layout) {
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(tabIndicatorX, {
+        toValue: layout.x,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(tabIndicatorWidth, {
+        toValue: layout.width,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [activeTab, tabLayouts, tabIndicatorWidth, tabIndicatorX, tabProgress]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setActiveTab(0);
+    }, []),
+  );
+
   // Load suggestions when Suggested tab is focused
   useFocusEffect(
     useCallback(() => {
@@ -99,6 +142,10 @@ export function HomeScreen() {
     playSearchTrackNow(track);
     addToRecentlyPlayed(track);
     await playTrack(targetIndex);
+  };
+
+  const handleTabPress = (index: number) => {
+    setActiveTab(index);
   };
 
   const handleArtistPress = async (artist: Artist) => {
@@ -162,8 +209,13 @@ export function HomeScreen() {
 
     addTrackToQueue(nextTrack);
     const updated = useMusicStore.getState();
-    const insertedIndex = updated.queue.findIndex((item) => item.id === nextTrack.id);
-    const targetIndex = Math.min(updated.currentIndex + 1, updated.queue.length - 1);
+    const insertedIndex = updated.queue.findIndex(
+      (item) => item.id === nextTrack.id,
+    );
+    const targetIndex = Math.min(
+      updated.currentIndex + 1,
+      updated.queue.length - 1,
+    );
 
     if (insertedIndex >= 0 && insertedIndex !== targetIndex) {
       moveTrackInQueue(insertedIndex, targetIndex);
@@ -234,19 +286,67 @@ export function HomeScreen() {
           {TABS.map((tab, idx) => (
             <Pressable
               key={idx}
-              style={[styles.tab, activeTab === idx && styles.tabActive]}
-              onPress={() => setActiveTab(idx)}
+              style={styles.tab}
+              onPress={() => handleTabPress(idx)}
+              onLayout={(event) => {
+                const { x, width } = event.nativeEvent.layout;
+                setTabLayouts((prev) => {
+                  const existing = prev[idx];
+                  if (
+                    existing &&
+                    existing.x === x &&
+                    existing.width === width
+                  ) {
+                    return prev;
+                  }
+
+                  return {
+                    ...prev,
+                    [idx]: { x, width },
+                  };
+                });
+              }}
             >
-              <Text
+              <Animated.Text
                 style={[
                   styles.tabText,
-                  activeTab === idx && styles.tabTextActive,
+                  {
+                    color: tabProgress.interpolate({
+                      inputRange: [idx - 1, idx, idx + 1],
+                      outputRange: [
+                        TEXT_SECONDARY,
+                        ACCENT_COLOR,
+                        TEXT_SECONDARY,
+                      ],
+                      extrapolate: "clamp",
+                    }),
+                    transform: [
+                      {
+                        scale: tabProgress.interpolate({
+                          inputRange: [idx - 1, idx, idx + 1],
+                          outputRange: [1, 1.05, 1],
+                          extrapolate: "clamp",
+                        }),
+                      },
+                    ],
+                  },
                 ]}
               >
                 {tab}
-              </Text>
+              </Animated.Text>
             </Pressable>
           ))}
+
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.tabIndicator,
+              {
+                width: tabIndicatorWidth,
+                transform: [{ translateX: tabIndicatorX }],
+              },
+            ]}
+          />
         </ScrollView>
       </View>
 
@@ -418,24 +518,24 @@ export function HomeScreen() {
         {activeTab === 2 && (
           <>
             {isLoadingArtists && artistsList.length === 0 && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={ACCENT_COLOR} />
-                </View>
-              )}
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={ACCENT_COLOR} />
+              </View>
+            )}
 
             {artistsList.length === 0 && !isLoadingArtists && (
-                <View style={styles.emptyContainer}>
-                  <Ionicons
-                    name="person-outline"
-                    size={64}
-                    color={TEXT_SECONDARY}
-                  />
-                  <Text style={styles.emptyText}>No artists found</Text>
-                  <Text style={styles.emptySubtext}>
-                    Try refreshing the Artists tab
-                  </Text>
-                </View>
-              )}
+              <View style={styles.emptyContainer}>
+                <Ionicons
+                  name="person-outline"
+                  size={64}
+                  color={TEXT_SECONDARY}
+                />
+                <Text style={styles.emptyText}>No artists found</Text>
+                <Text style={styles.emptySubtext}>
+                  Try refreshing the Artists tab
+                </Text>
+              </View>
+            )}
 
             {artistsList.length > 0 && (
               <View style={styles.listContainer}>
@@ -583,28 +683,65 @@ export function HomeScreen() {
               />
             ) : (
               <View style={styles.sheetActions}>
-                <Pressable style={styles.sheetActionRow} onPress={() => void handlePlayArtistNow()}>
-                  <Ionicons name="play-circle-outline" size={20} color={TEXT_PRIMARY} />
+                <Pressable
+                  style={styles.sheetActionRow}
+                  onPress={() => void handlePlayArtistNow()}
+                >
+                  <Ionicons
+                    name="play-circle-outline"
+                    size={20}
+                    color={TEXT_PRIMARY}
+                  />
                   <Text style={styles.sheetActionText}>Play</Text>
                 </Pressable>
 
-                <Pressable style={styles.sheetActionRow} onPress={handlePlayArtistNext}>
-                  <Ionicons name="play-forward-outline" size={20} color={TEXT_PRIMARY} />
+                <Pressable
+                  style={styles.sheetActionRow}
+                  onPress={handlePlayArtistNext}
+                >
+                  <Ionicons
+                    name="play-forward-outline"
+                    size={20}
+                    color={TEXT_PRIMARY}
+                  />
                   <Text style={styles.sheetActionText}>Play Next</Text>
                 </Pressable>
 
-                <Pressable style={styles.sheetActionRow} onPress={handleAddArtistToQueue}>
-                  <Ionicons name="add-circle-outline" size={20} color={TEXT_PRIMARY} />
-                  <Text style={styles.sheetActionText}>Add to Playing Queue</Text>
+                <Pressable
+                  style={styles.sheetActionRow}
+                  onPress={handleAddArtistToQueue}
+                >
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={20}
+                    color={TEXT_PRIMARY}
+                  />
+                  <Text style={styles.sheetActionText}>
+                    Add to Playing Queue
+                  </Text>
                 </Pressable>
 
-                <Pressable style={styles.sheetActionRow} onPress={handleAddArtistToPlaylist}>
-                  <Ionicons name="heart-outline" size={20} color={TEXT_PRIMARY} />
+                <Pressable
+                  style={styles.sheetActionRow}
+                  onPress={handleAddArtistToPlaylist}
+                >
+                  <Ionicons
+                    name="heart-outline"
+                    size={20}
+                    color={TEXT_PRIMARY}
+                  />
                   <Text style={styles.sheetActionText}>Add to Playlist</Text>
                 </Pressable>
 
-                <Pressable style={styles.sheetActionRow} onPress={() => void handleShareArtist()}>
-                  <Ionicons name="share-social-outline" size={20} color={TEXT_PRIMARY} />
+                <Pressable
+                  style={styles.sheetActionRow}
+                  onPress={() => void handleShareArtist()}
+                >
+                  <Ionicons
+                    name="share-social-outline"
+                    size={20}
+                    color={TEXT_PRIMARY}
+                  />
                   <Text style={styles.sheetActionText}>Share</Text>
                 </Pressable>
               </View>
@@ -650,24 +787,23 @@ const styles = StyleSheet.create({
   tabsContent: {
     paddingHorizontal: 16,
     gap: 4,
+    position: "relative",
   },
   tab: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  tabActive: {
-    borderBottomColor: ACCENT_COLOR,
   },
   tabText: {
     fontSize: 13,
-    color: TEXT_SECONDARY,
-    fontWeight: "500",
+    fontWeight: "600",
   },
-  tabTextActive: {
-    color: ACCENT_COLOR,
-    fontWeight: "700",
+  tabIndicator: {
+    position: "absolute",
+    left: 0,
+    bottom: 0,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: ACCENT_COLOR,
   },
   content: {
     flex: 1,

@@ -1,7 +1,8 @@
-import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 import React from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { MiniPlayer } from "@/components/mini-player";
@@ -9,29 +10,43 @@ import { MiniPlayer } from "@/components/mini-player";
 const ACTIVE_TINT = "#FF8A65";
 const INACTIVE_TINT = "#8B8FA8";
 
-const TAB_SCREEN_OPTIONS = {
-  tabBarActiveTintColor: ACTIVE_TINT,
-  tabBarInactiveTintColor: INACTIVE_TINT,
-  tabBarShowLabel: true,
-  tabBarLabelStyle: {
-    fontSize: 11,
-    marginBottom: 4,
-  },
-  tabBarStyle: {
-    backgroundColor: "#111322",
-    borderTopColor: "#262641",
-    borderTopWidth: 1,
-    height: 66,
-    paddingTop: 6,
-  },
-  headerShown: false,
-  tabBarButton: HapticTab,
-} as const;
-
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
+  const tabBarHeight = 62 + Math.max(insets.bottom, 8);
+
   return (
-    <View style={{ flex: 1 }}>
-      <Tabs screenOptions={TAB_SCREEN_OPTIONS}>
+    <View style={{ flex: 1, backgroundColor: "#111322" }}>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: ACTIVE_TINT,
+          tabBarInactiveTintColor: INACTIVE_TINT,
+          tabBarShowLabel: true,
+          tabBarLabelStyle: {
+            fontSize: 11,
+            marginBottom: 2,
+          },
+          tabBarStyle: {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "#111322",
+            borderTopColor: "#262641",
+            borderTopWidth: 1,
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+            height: tabBarHeight,
+            paddingTop: 6,
+            paddingBottom: Math.max(insets.bottom, 8),
+          },
+          sceneStyle: {
+            backgroundColor: "#1a1a2e",
+          },
+          headerShown: false,
+          tabBarButton: HapticTab,
+        }}
+      >
         <Tabs.Screen
           name="index"
           options={{
