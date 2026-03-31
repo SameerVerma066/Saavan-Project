@@ -16,7 +16,7 @@ import { useMusicStore } from "@/store/music-store";
 export default function FavoritesTab() {
   const insets = useSafeAreaInsets();
   const likedSongs = useMusicStore((state) => state.likedSongs);
-  const playSearchTrackNow = useMusicStore((state) => state.playSearchTrackNow);
+  const setQueueAndIndex = useMusicStore((state) => state.setQueueAndIndex);
   const addToRecentlyPlayed = useMusicStore(
     (state) => state.addToRecentlyPlayed,
   );
@@ -24,17 +24,13 @@ export default function FavoritesTab() {
 
   const { playTrack } = usePlayer();
 
-  const handlePlayTrack = async (track: (typeof likedSongs)[number]) => {
-    const stateBefore = useMusicStore.getState();
-    const existingIndex = stateBefore.queue.findIndex(
-      (item) => item.id === track.id,
-    );
-    const targetIndex =
-      existingIndex >= 0 ? existingIndex : stateBefore.queue.length;
-
-    playSearchTrackNow(track);
+  const handlePlayTrack = async (
+    track: (typeof likedSongs)[number],
+    index: number,
+  ) => {
+    setQueueAndIndex(likedSongs, index);
     addToRecentlyPlayed(track);
-    await playTrack(targetIndex);
+    await playTrack(index);
   };
 
   return (
@@ -55,10 +51,10 @@ export default function FavoritesTab() {
             data={likedSongs}
             keyExtractor={(item, idx) => `${item.id}-fav-${idx}`}
             contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
+            renderItem={({ item, index }) => (
               <Pressable
                 style={styles.row}
-                onPress={() => void handlePlayTrack(item)}
+                onPress={() => void handlePlayTrack(item, index)}
               >
                 <Image source={{ uri: item.artwork }} style={styles.artwork} />
 

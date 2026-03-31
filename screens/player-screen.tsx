@@ -18,13 +18,16 @@ export function PlayerScreen() {
     togglePlayPause,
     seekTo,
     shuffleEnabled,
-    repeatMode,
     toggleShuffle,
-    cycleRepeatMode,
   } = usePlayer();
 
   const toggleLike = useMusicStore((state) => state.toggleLike);
-  const isLiked = useMusicStore((state) => state.isLiked);
+  const currentTrackId = currentTrack?.id ?? null;
+  const liked = useMusicStore((state) =>
+    currentTrackId
+      ? state.likedSongs.some((track) => track.id === currentTrackId)
+      : false,
+  );
 
   const [progressWidth, setProgressWidth] = useState(0);
 
@@ -36,6 +39,15 @@ export function PlayerScreen() {
     return Math.max(0, Math.min(1, positionMillis / durationMillis));
   }, [durationMillis, positionMillis]);
 
+  const handleSeekByPosition = (locationX: number) => {
+    if (!durationMillis || progressWidth <= 0) {
+      return;
+    }
+
+    const ratio = Math.max(0, Math.min(1, locationX / progressWidth));
+    void seekTo(ratio * durationMillis);
+  };
+
   if (!currentTrack) {
     return (
       <SafeAreaView style={styles.container}>
@@ -45,8 +57,6 @@ export function PlayerScreen() {
       </SafeAreaView>
     );
   }
-
-  const liked = isLiked(currentTrack.id);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -65,20 +75,20 @@ export function PlayerScreen() {
         <Pressable
           style={styles.progressTrack}
           onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
-          onPress={(event) => {
-            if (!durationMillis || progressWidth <= 0) {
-              return;
-            }
-
-            const ratio = Math.max(
-              0,
-              Math.min(1, event.nativeEvent.locationX / progressWidth),
-            );
-            void seekTo(ratio * durationMillis);
-          }}
+          onPress={(event) => handleSeekByPosition(event.nativeEvent.locationX)}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={(event) =>
+            handleSeekByPosition(event.nativeEvent.locationX)
+          }
+          onResponderMove={(event) =>
+            handleSeekByPosition(event.nativeEvent.locationX)
+          }
         >
           <View
             style={[styles.progressFill, { width: `${progress * 100}%` }]}
+          />
+          <View
+            style={[styles.progressThumb, { left: `${progress * 100}%` }]}
           />
         </Pressable>
 
@@ -119,27 +129,20 @@ export function PlayerScreen() {
           </Pressable>
 
           <Pressable
-            style={styles.modeBtn}
+            style={({ pressed }) => [
+              styles.modeBtn,
+              styles.likeBtn,
+              liked && styles.likeBtnActive,
+              pressed && styles.modeBtnPressed,
+            ]}
+            hitSlop={8}
             onPress={() => toggleLike(currentTrack)}
           >
             <Ionicons
               name={liked ? "heart" : "heart-outline"}
-              size={19}
-              color={liked ? "#FF6B6B" : "#64748b"}
+              size={21}
+              color={liked ? "#ef4444" : "#94a3b8"}
             />
-          </Pressable>
-        </View>
-
-        <View style={styles.bottomControlRow}>
-          <Pressable style={styles.modeBtn} onPress={cycleRepeatMode}>
-            <Text
-              style={[
-                styles.repeatText,
-                repeatMode !== "off" && styles.repeatActive,
-              ]}
-            >
-              {repeatMode === "off" ? "R" : repeatMode === "all" ? "RA" : "R1"}
-            </Text>
           </Pressable>
         </View>
       </View>
@@ -150,7 +153,7 @@ export function PlayerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#0f1220",
   },
   content: {
     flex: 1,
@@ -160,40 +163,52 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#f8fafc",
     marginBottom: 16,
   },
   empty: {
-    color: "#64748b",
+    color: "#8B8FA8",
     marginTop: 20,
   },
   artwork: {
     width: "100%",
     aspectRatio: 1,
     borderRadius: 24,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#1f2937",
   },
   title: {
     marginTop: 16,
     fontSize: 24,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#f8fafc",
   },
   artist: {
     marginTop: 4,
-    color: "#475569",
+    color: "#9CA3AF",
     fontSize: 16,
   },
   progressTrack: {
     marginTop: 22,
-    height: 8,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#2a2c40",
     overflow: "hidden",
+    justifyContent: "center",
   },
   progressFill: {
     height: "100%",
     backgroundColor: "#0ea5e9",
+  },
+  progressThumb: {
+    position: "absolute",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#ffffff",
+    borderWidth: 3,
+    borderColor: "#0ea5e9",
+    marginLeft: -9,
+    elevation: 3,
   },
   timeRow: {
     marginTop: 10,
@@ -201,7 +216,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   time: {
-    color: "#64748b",
+    color: "#8B8FA8",
     fontSize: 13,
   },
   controlRow: {
@@ -211,19 +226,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  bottomControlRow: {
-    marginTop: 24,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   modeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#1f2937",
+  },
+  modeBtnPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.96 }],
+  },
+  likeBtn: {
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  likeBtnActive: {
+    backgroundColor: "#450a0a",
+    borderColor: "#7f1d1d",
   },
   roundButton: {
     width: 52,
@@ -231,7 +252,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#1f2937",
   },
   playButton: {
     width: 64,
@@ -240,13 +261,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#0284c7",
-  },
-  repeatText: {
-    color: "#64748b",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  repeatActive: {
-    color: "#0284c7",
   },
 });

@@ -131,7 +131,18 @@ export function HomeScreen() {
     }, [activeTab, loadSuggestedTab, loadArtistsTab]),
   );
 
-  const handlePlayTrack = async (track: any) => {
+  const handlePlayTrack = async (
+    track: Track,
+    sourceList?: Track[],
+    sourceIndex?: number,
+  ) => {
+    if (sourceList && sourceList.length > 0 && sourceIndex !== undefined) {
+      setQueueAndIndex(sourceList, sourceIndex);
+      addToRecentlyPlayed(track);
+      await playTrack(sourceIndex);
+      return;
+    }
+
     const stateBefore = useMusicStore.getState();
     const existingIndex = stateBefore.queue.findIndex(
       (item) => item.id === track.id,
@@ -271,9 +282,27 @@ export function HomeScreen() {
             <Ionicons name="musical-notes" size={24} color={ACCENT_COLOR} />
             <Text style={styles.appName}>Saavan</Text>
           </View>
-          <Pressable>
-            <Ionicons name="search" size={24} color={TEXT_PRIMARY} />
-          </Pressable>
+
+          <View style={styles.headerSearchRow}>
+            <Ionicons name="search" size={18} color={TEXT_SECONDARY} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search songs..."
+              placeholderTextColor={TEXT_SECONDARY}
+              style={styles.headerSearchInput}
+              onSubmitEditing={() => {
+                setActiveTab(1);
+                void loadInitialSongs();
+              }}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery("")}>
+                <Ionicons name="close" size={16} color={TEXT_SECONDARY} />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Tab Navigation */}
@@ -374,10 +403,12 @@ export function HomeScreen() {
                   numColumns={2}
                   scrollEnabled={false}
                   columnWrapperStyle={styles.gridRow}
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <Pressable
                       style={styles.gridCard}
-                      onPress={() => handlePlayTrack(item)}
+                      onPress={() =>
+                        handlePlayTrack(item, recentlyPlayed.slice(0, 6), index)
+                      }
                     >
                       <Image
                         source={{ uri: item.artwork }}
@@ -406,7 +437,7 @@ export function HomeScreen() {
                     <Pressable
                       key={`${item.id}-artist-${idx}`}
                       style={styles.artistCardCircular}
-                      onPress={() => handlePlayTrack(item)}
+                      onPress={() => handlePlayTrack(item, randomArtists, idx)}
                     >
                       <Image
                         source={{ uri: item.artwork }}
@@ -433,10 +464,10 @@ export function HomeScreen() {
                   numColumns={2}
                   scrollEnabled={false}
                   columnWrapperStyle={styles.gridRow}
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <Pressable
                       style={styles.gridCard}
-                      onPress={() => handlePlayTrack(item)}
+                      onPress={() => handlePlayTrack(item, randomSongs, index)}
                     >
                       <Image
                         source={{ uri: item.artwork }}
@@ -477,10 +508,10 @@ export function HomeScreen() {
                   data={likedSongs}
                   keyExtractor={(item, idx) => `${item.id}-liked-${idx}`}
                   scrollEnabled={false}
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <Pressable
                       style={styles.songListItem}
-                      onPress={() => handlePlayTrack(item)}
+                      onPress={() => handlePlayTrack(item, likedSongs, index)}
                     >
                       <Image
                         source={{ uri: item.artwork }}
@@ -576,30 +607,6 @@ export function HomeScreen() {
         {/* Other Tabs - Search Results */}
         {activeTab !== 0 && activeTab !== 1 && activeTab !== 2 && (
           <>
-            {/* Search Bar */}
-            <View style={styles.searchRow}>
-              <Ionicons
-                name="search"
-                size={18}
-                color={TEXT_SECONDARY}
-                style={styles.searchIcon}
-              />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search songs..."
-                placeholderTextColor={TEXT_SECONDARY}
-                style={styles.input}
-                onSubmitEditing={() => void loadInitialSongs()}
-                returnKeyType="search"
-              />
-              {searchQuery.length > 0 && (
-                <Pressable onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close" size={18} color={TEXT_SECONDARY} />
-                </Pressable>
-              )}
-            </View>
-
             {/* Search Results */}
             {searchResults.length > 0 && (
               <View style={styles.section}>
@@ -611,10 +618,12 @@ export function HomeScreen() {
                   columnWrapperStyle={styles.gridRow}
                   onEndReached={() => void loadMoreSongs()}
                   onEndReachedThreshold={0.3}
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <Pressable
                       style={styles.gridCard}
-                      onPress={() => handlePlayTrack(item)}
+                      onPress={() =>
+                        handlePlayTrack(item, searchResults, index)
+                      }
                     >
                       <Image
                         source={{ uri: item.artwork }}
@@ -770,6 +779,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
     marginTop: 12,
+    gap: 12,
   },
   logoSection: {
     flexDirection: "row",
@@ -780,6 +790,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: TEXT_PRIMARY,
+  },
+  headerSearchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: SECONDARY_BG,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 40,
+    flex: 1,
+    maxWidth: 240,
+    gap: 6,
+  },
+  headerSearchInput: {
+    flex: 1,
+    color: TEXT_PRIMARY,
+    fontSize: 13,
+    paddingVertical: 0,
   },
   tabsContainer: {
     marginHorizontal: -16,
