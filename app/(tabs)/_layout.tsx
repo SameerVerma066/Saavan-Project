@@ -1,19 +1,28 @@
 import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { View } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { MiniPlayer } from "@/components/mini-player";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
+
+const ACTIVE_TINT = "#FF8A65";
+const INACTIVE_TINT = "#8B8FA8";
 
 const TAB_SCREEN_OPTIONS = {
-  tabBarActiveTintColor: Colors.dark.tint,
-  tabBarInactiveTintColor: Colors.dark.tabIconDefault,
+  tabBarActiveTintColor: ACTIVE_TINT,
+  tabBarInactiveTintColor: INACTIVE_TINT,
+  tabBarShowLabel: true,
+  tabBarLabelStyle: {
+    fontSize: 11,
+    marginBottom: 4,
+  },
   tabBarStyle: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: "#111322",
     borderTopColor: "#262641",
     borderTopWidth: 1,
+    height: 66,
+    paddingTop: 6,
   },
   headerShown: false,
   tabBarButton: HapticTab,
@@ -26,18 +35,36 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: "Saavan",
+            title: "Home",
             tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="house.fill" color={color} />
+              <Ionicons size={20} name="home" color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="favorites"
+          options={{
+            title: "Favorites",
+            tabBarIcon: ({ color }) => (
+              <Ionicons size={20} name="heart-outline" color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="explore"
           options={{
-            title: "Queue",
+            title: "Playlists",
             tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="music.note.list" color={color} />
+              <Ionicons size={20} name="list" color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <Ionicons size={20} name="settings-outline" color={color} />
             ),
           }}
         />

@@ -23,9 +23,12 @@ type SaavnArtist = {
 type SaavnSearchSong = {
   id: string;
   name?: string;
+  subtitle?: string;
   primaryArtists?: string | SaavnArtist[];
   artists?: {
     primary?: SaavnArtist[];
+    all?: SaavnArtist[];
+    featured?: SaavnArtist[];
   };
   album?: {
     name?: string;
@@ -119,9 +122,29 @@ function getBestArtwork(images: SaavnSongImage[]) {
 
 function getArtistName(song: SaavnSearchSong): string {
   try {
+    const invalidNames = new Set([
+      "unknown",
+      "unknown artist",
+      "various artists",
+    ]);
+
+    const normalizeCandidate = (value?: string) => {
+      const cleaned = (value ?? "").replace(/&amp;/g, "&").trim();
+      if (!cleaned) {
+        return "";
+      }
+
+      const lower = cleaned.toLowerCase();
+      if (invalidNames.has(lower)) {
+        return "";
+      }
+
+      return cleaned;
+    };
+
     // Try primaryArtists as string first
     if (typeof song.primaryArtists === "string") {
-      const trimmed = song.primaryArtists.trim();
+      const trimmed = normalizeCandidate(song.primaryArtists);
       if (trimmed.length > 0) {
         return trimmed;
       }
@@ -133,7 +156,7 @@ function getArtistName(song: SaavnSearchSong): string {
         .map((artist) => {
           if (!artist) return "";
           const name = typeof artist === "string" ? artist : artist.name;
-          return name?.trim() ?? "";
+          return normalizeCandidate(name);
         })
         .filter((name) => name.length > 0);
 
@@ -144,11 +167,35 @@ function getArtistName(song: SaavnSearchSong): string {
 
     // Try artists.primary array
     const primaryFromArtists = (song.artists?.primary ?? [])
-      .map((artist) => artist?.name?.trim() ?? "")
+      .map((artist) => normalizeCandidate(artist?.name))
       .filter((name) => name.length > 0);
 
     if (primaryFromArtists.length > 0) {
       return primaryFromArtists.join(", ");
+    }
+
+    // Try artists.all array
+    const allArtists = (song.artists?.all ?? [])
+      .map((artist) => normalizeCandidate(artist?.name))
+      .filter((name) => name.length > 0);
+
+    if (allArtists.length > 0) {
+      return allArtists.join(", ");
+    }
+
+    // Try artists.featured array
+    const featuredArtists = (song.artists?.featured ?? [])
+      .map((artist) => normalizeCandidate(artist?.name))
+      .filter((name) => name.length > 0);
+
+    if (featuredArtists.length > 0) {
+      return featuredArtists.join(", ");
+    }
+
+    // Fallback from subtitle field
+    const subtitle = normalizeCandidate(song.subtitle);
+    if (subtitle.length > 0) {
+      return subtitle;
     }
   } catch (error) {
     // Silently handle any parsing errors
