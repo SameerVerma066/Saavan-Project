@@ -2,14 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useState } from "react";
 import {
-    FlatList,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { usePlayer } from "@/context/player-context";
@@ -21,7 +21,7 @@ const SECONDARY_BG = "#262641";
 const TEXT_PRIMARY = "#FFFFFF";
 const TEXT_SECONDARY = "#b0b0b0";
 
-const TABS = ["Suggested", "Songs", "Artists", "Albums"];
+const TABS = ["Suggested", "Songs", "Artists", "Albums", "Folder"];
 
 export function HomeScreen() {
   const [activeTab, setActiveTab] = useState(0);
@@ -52,7 +52,7 @@ export function HomeScreen() {
         <View style={styles.topBar}>
           <View style={styles.logoSection}>
             <Ionicons name="musical-notes" size={24} color={ACCENT_COLOR} />
-            <Text style={styles.appName}>Mume</Text>
+            <Text style={styles.appName}>Saavan</Text>
           </View>
           <Pressable>
             <Ionicons name="search" size={24} color={TEXT_PRIMARY} />
