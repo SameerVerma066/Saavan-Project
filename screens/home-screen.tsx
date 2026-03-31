@@ -16,7 +16,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePlayer } from "@/context/player-context";
+import { searchSongs } from "@/services/saavn-api";
 import { useMusicStore } from "@/store/music-store";
+import type { Track } from "@/types/track";
 
 const ACCENT_COLOR = "#FF8A65";
 const BACKGROUND = "#1a1a2e";
@@ -63,6 +65,12 @@ export function HomeScreen() {
   const artistsList = useMusicStore((state) => state.artistsList);
   const isLoadingArtists = useMusicStore((state) => state.isLoadingArtists);
   const loadArtistsTab = useMusicStore((state) => state.loadArtistsTab);
+  const [selectedArtistName, setSelectedArtistName] = useState<string | null>(
+    null,
+  );
+  const [artistSongs, setArtistSongs] = useState<Track[]>([]);
+  const [isLoadingArtistSongs, setIsLoadingArtistSongs] = useState(false);
+  const [artistSongsError, setArtistSongsError] = useState<string | null>(null);
 
   const { playTrack } = usePlayer();
 
@@ -88,6 +96,35 @@ export function HomeScreen() {
     playSearchTrackNow(track);
     addToRecentlyPlayed(track);
     await playTrack(targetIndex);
+  };
+
+  const handleArtistPress = async (artistName: string) => {
+    setSelectedArtistName(artistName);
+    setIsLoadingArtistSongs(true);
+    setArtistSongsError(null);
+
+    try {
+      const result = await searchSongs({
+        query: artistName,
+        page: 1,
+        limit: 30,
+      });
+
+      setArtistSongs(result.tracks);
+    } catch (error) {
+      setArtistSongsError(
+        error instanceof Error ? error.message : "Failed to load artist songs",
+      );
+      setArtistSongs([]);
+    } finally {
+      setIsLoadingArtistSongs(false);
+    }
+  };
+
+  const handleBackToArtists = () => {
+    setSelectedArtistName(null);
+    setArtistSongs([]);
+    setArtistSongsError(null);
   };
 
   return (
@@ -297,13 +334,13 @@ export function HomeScreen() {
         {/* Artists Tab - Random Artists List */}
         {activeTab === 2 && (
           <>
-            {isLoadingArtists && artistsList.length === 0 && (
+            {!selectedArtistName && isLoadingArtists && artistsList.length === 0 && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={ACCENT_COLOR} />
               </View>
             )}
 
-            {artistsList.length === 0 && !isLoadingArtists && (
+            {!selectedArtistName && artistsList.length === 0 && !isLoadingArtists && (
               <View style={styles.emptyContainer}>
                 <Ionicons
                   name="person-outline"
@@ -317,7 +354,7 @@ export function HomeScreen() {
               </View>
             )}
 
-            {artistsList.length > 0 && (
+            {!selectedArtistName && artistsList.length > 0 && (
               <View style={styles.artistsGridContainer}>
                 <FlatList
                   data={artistsList}
@@ -326,7 +363,10 @@ export function HomeScreen() {
                   scrollEnabled={false}
                   columnWrapperStyle={styles.gridRow}
                   renderItem={({ item }) => (
-                    <Pressable style={styles.artistGridCard}>
+                    <Pressable
+                      style={styles.artistGridCard}
+                      onPress={() => void handleArtistPress(item.name)}
+                    >
                       <Image
                         source={{ uri: item.image }}
                         style={styles.artistGridImage}
@@ -337,6 +377,82 @@ export function HomeScreen() {
                     </Pressable>
                   )}
                 />
+              </View>
+            )}
+
+            {selectedArtistName && (
+              <View style={styles.listContainer}>
+                <View style={styles.artistSongsHeader}>
+                  <Pressable
+                    style={styles.artistBackButton}
+                    onPress={handleBackToArtists}
+                  >
+                    <Ionicons name="arrow-back" size={18} color={TEXT_PRIMARY} />
+                  </Pressable>
+                  <View style={styles.artistSongsTitleWrap}>
+                    <Text numberOfLines={1} style={styles.artistSongsTitle}>
+                      {selectedArtistName}
+                    </Text>
+                    <Text style={styles.artistSongsMeta}>
+                      {artistSongs.length} songs
+                    </Text>
+                  </View>
+                </View>
+
+                {isLoadingArtistSongs && (
+                  <ActivityIndicator
+                    size="large"
+                    color={ACCENT_COLOR}
+                    style={styles.loader}
+                  />
+                )}
+
+                {artistSongsError && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{artistSongsError}</Text>
+                  </View>
+                )}
+
+                {!isLoadingArtistSongs && !artistSongsError && artistSongs.length === 0 && (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="musical-notes-outline" size={56} color={TEXT_SECONDARY} />
+                    <Text style={styles.emptyText}>No songs found</Text>
+                  </View>
+                )}
+
+                {!isLoadingArtistSongs && artistSongs.length > 0 && (
+                  <FlatList
+                    data={artistSongs}
+                    keyExtractor={(item, idx) => `${item.id}-artist-song-${idx}`}
+                    scrollEnabled={false}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        style={styles.songListItem}
+                        onPress={() => void handlePlayTrack(item)}
+                      >
+                        <Image
+                          source={{ uri: item.artwork }}
+                          style={styles.songListImage}
+                        />
+                        <View style={styles.songListContent}>
+                          <Text numberOfLines={1} style={styles.songListTitle}>
+                            {item.title}
+                          </Text>
+                          <Text numberOfLines={1} style={styles.songListArtist}>
+                            {item.artist}
+                          </Text>
+                        </View>
+                        <View style={styles.songPlayIconWrap}>
+                          <Ionicons
+                            name="play"
+                            size={20}
+                            color={ACCENT_COLOR}
+                          />
+                        </View>
+                      </Pressable>
+                    )}
+                  />
+                )}
               </View>
             )}
           </>
@@ -686,6 +802,41 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: TEXT_PRIMARY,
     marginBottom: 4,
+  },
+  artistSongsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  artistBackButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SECONDARY_BG,
+    marginRight: 10,
+  },
+  artistSongsTitleWrap: {
+    flex: 1,
+  },
+  artistSongsTitle: {
+    color: TEXT_PRIMARY,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  artistSongsMeta: {
+    color: TEXT_SECONDARY,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  songPlayIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 138, 101, 0.12)",
   },
   bottomSpacer: {
     height: 100,
