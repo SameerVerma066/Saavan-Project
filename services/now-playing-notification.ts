@@ -1,4 +1,4 @@
-import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import type { Track } from "@/types/track";
@@ -8,8 +8,37 @@ const NOW_PLAYING_CHANNEL_ID = "now-playing";
 let configured = false;
 let activeNotificationId: string | null = null;
 
+type NotificationsModule = typeof import("expo-notifications");
+
+function isSupportedRuntime() {
+  if (Platform.OS !== "android") {
+    return false;
+  }
+
+  // Expo Go does not support the notifications APIs used here.
+  return Constants.appOwnership !== "expo";
+}
+
+async function getNotificationsModule(): Promise<NotificationsModule | null> {
+  if (!isSupportedRuntime()) {
+    return null;
+  }
+
+  try {
+    const notifications = await import("expo-notifications");
+    return notifications;
+  } catch {
+    return null;
+  }
+}
+
 async function ensureConfigured() {
-  if (configured || Platform.OS !== "android") {
+  if (configured) {
+    return;
+  }
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
     return;
   }
 
@@ -26,7 +55,8 @@ async function ensureConfigured() {
 }
 
 export async function requestNotificationPermissions() {
-  if (Platform.OS !== "android") {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
     return;
   }
 
@@ -46,7 +76,8 @@ export async function updateNowPlayingNotification(
   track: Track,
   isPlaying: boolean,
 ) {
-  if (Platform.OS !== "android") {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
     return;
   }
 
@@ -75,7 +106,8 @@ export async function updateNowPlayingNotification(
 }
 
 export async function clearNowPlayingNotification() {
-  if (Platform.OS !== "android") {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
     return;
   }
 
