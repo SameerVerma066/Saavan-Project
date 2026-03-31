@@ -1,50 +1,209 @@
-# Welcome to your Expo app 👋
+# Saavan Player
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Saavan Player is a React Native music player built with Expo and Expo Router.
+It fetches music metadata and streaming URLs from the JioSaavn-compatible API at:
 
-## Get started
+`https://saavn.sumit.co`
 
-1. Install dependencies
+The app includes:
 
-   ```bash
-   npm install
-   ```
+- Suggested discovery (random songs + artists)
+- Search with pagination
+- Artist action sheet (play, queue, playlist-like actions, share)
+- Persistent playback queue
+- Favorites (liked songs)
+- Recently played history
+- Mini player + full player screen
 
-2. Start the app
+## Tech Stack
 
-   ```bash
-   npx expo start
-   ```
+- Expo SDK 54
+- React 19 + React Native 0.81
+- TypeScript
+- Expo Router (file-based routing)
+- Zustand + AsyncStorage persistence
+- Expo AV for playback
+- Expo Image and Expo Vector Icons
 
-In the output, you'll find options to open the app in a
+## Project Structure
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+```text
+app/
+   (tabs)/
+      _layout.tsx        # Bottom tab layout + MiniPlayer mount
+      index.tsx          # Home tab route
+      favorites.tsx      # Favorites (liked songs)
+      explore.tsx        # Playlists tab (placeholder)
+      settings.tsx       # Settings tab (placeholder)
+   player.tsx           # Full player route
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+screens/
+   home-screen.tsx      # Suggested/Songs/Artists/Albums/Folder top tabs
+   player-screen.tsx    # Full player UI
 
-## Get a fresh project
+context/
+   player-context.tsx   # Playback engine + AV lifecycle + queue transitions
 
-When you're ready, run:
+store/
+   music-store.ts       # Global app state, queue, likes, suggestions, artists
 
-```bash
-npm run reset-project
+services/
+   saavn-api.ts         # API client + data normalization
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Features
 
-## Learn more
+### 1. Playback Engine
 
-To learn more about developing your project with Expo, look at the following resources:
+- Queue-based playback with next/previous
+- Shuffle and repeat modes (`off`, `all`, `one`)
+- Progress tracking and seeking
+- Safe track transition logic to avoid overlapping playback
+- Automatic next track behavior when song finishes
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Core file: `context/player-context.tsx`
 
-## Join the community
+### 2. Song Discovery and Search
 
-Join our community of developers creating universal apps.
+- Random suggestions for the Suggested tab
+- Random artists on Artists tab
+- Search endpoint integration with pagination
+- Data normalization for track metadata and stream URLs
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Core file: `services/saavn-api.ts`
+
+### 3. State Management
+
+Zustand store handles:
+
+- Queue and current playback index
+- Playback state (`isPlaying`, position, duration)
+- Search state and pagination
+- Suggested content
+- Liked songs
+- Recently played
+- Artists tab data
+
+Persisted to AsyncStorage:
+
+- Queue
+- Current index
+- Shuffle/repeat settings
+- Recently played
+- Liked songs
+
+Core file: `store/music-store.ts`
+
+### 4. UI and Navigation
+
+- Bottom tab navigation: Home, Favorites, Playlists, Settings
+- Home screen top category tabs with smooth animated indicator
+- Artist action bottom sheet style modal
+- Mini player fixed above tab bar
+- Safe-area aware layouts across tabs
+
+## API Notes
+
+Current API base:
+
+`https://saavn.sumit.co`
+
+Used endpoints:
+
+- `GET /api/search/songs?query=&page=&limit=`
+- `GET /api/search/artists?query=&page=&limit=`
+
+The app normalizes:
+
+- Track title, artist, album, artwork
+- Best available download/stream URL
+- Duration labels and milliseconds
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
+- Android Studio emulator or physical device (or iOS simulator on macOS)
+
+### Install
+
+```bash
+npm install
+```
+
+### Run
+
+```bash
+npm run start
+```
+
+Useful variants:
+
+```bash
+npm run android
+npm run ios
+npm run web
+```
+
+## Available Scripts
+
+- `npm run start` - Start Expo dev server
+- `npm run android` - Start and open Android target
+- `npm run ios` - Start and open iOS target
+- `npm run web` - Start web build target
+- `npm run lint` - Run Expo/ESLint checks
+- `npm run reset-project` - Reset scaffold helper script
+
+## Configuration
+
+Key config lives in:
+
+- `app.json` (name, icon, splash, scheme, platform config)
+- `tsconfig.json`
+- `eslint.config.js`
+
+Notable app config:
+
+- `scheme`: `saavanplayer`
+- Android edge-to-edge enabled
+- Typed routes enabled via Expo Router experiments
+
+## Known Limitations
+
+- Playlists and Settings tabs are currently placeholders.
+- Artist song loading is query-based and depends on API matching quality.
+- Streaming reliability depends on the external API response quality.
+
+## Roadmap Ideas
+
+- Real custom playlists (CRUD)
+- Download/offline caching
+- Better queue editor screen integration
+- Lyrics and richer track metadata
+- Background controls and notification actions
+
+## Troubleshooting
+
+### App opens but songs do not play
+
+- Verify network access to `https://saavn.sumit.co`
+- Check if fetched tracks include valid `streamUrl`
+
+### Empty suggestions/artists
+
+- API may return sparse data for a given random query
+- Retry by switching tabs or searching manually
+
+### Metro / Expo issues
+
+Try:
+
+```bash
+npx expo start -c
+```
+
+## License
+
+This project is currently unlicensed for distribution. Add a LICENSE file if you plan to publish it.
