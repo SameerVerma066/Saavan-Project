@@ -288,17 +288,22 @@ export async function searchArtists(params: {
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Search Artists API failed with status ${response.status}`);
+      throw new Error(
+        `Search Artists API failed with status ${response.status}`,
+      );
     }
 
     const payload = (await response.json()) as SearchArtistsResponse;
     const results = payload.data?.results ?? [];
-    
+
     const artists = results
       .map((artist) => ({
         id: artist.id ?? "",
         name: artist.name ?? "Unknown Artist",
-        image: artist.image?.[0]?.url ?? artist.image?.[0]?.link ?? "https://picsum.photos/500",
+        image:
+          artist.image?.[0]?.url ??
+          artist.image?.[0]?.link ??
+          "https://picsum.photos/500",
         url: artist.url ?? "",
       }))
       .filter((artist) => artist.id.length > 0);
@@ -324,7 +329,9 @@ export async function searchArtists(params: {
 }
 
 // Get random artists from API
-export async function getRandomArtistsFromAPI(limit: number = 6): Promise<Artist[]> {
+export async function getRandomArtistsFromAPI(
+  limit: number = 6,
+): Promise<Artist[]> {
   const artistQueries = [
     "arijit singh",
     "taylor swift",

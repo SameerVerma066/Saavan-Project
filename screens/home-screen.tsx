@@ -78,10 +78,16 @@ export function HomeScreen() {
   );
 
   const handlePlayTrack = async (track: any) => {
+    const stateBefore = useMusicStore.getState();
+    const existingIndex = stateBefore.queue.findIndex(
+      (item) => item.id === track.id,
+    );
+    const targetIndex =
+      existingIndex >= 0 ? existingIndex : stateBefore.queue.length;
+
     playSearchTrackNow(track);
     addToRecentlyPlayed(track);
-    const state = useMusicStore.getState();
-    await playTrack(state.currentIndex);
+    await playTrack(targetIndex);
   };
 
   return (
@@ -299,7 +305,11 @@ export function HomeScreen() {
 
             {artistsList.length === 0 && !isLoadingArtists && (
               <View style={styles.emptyContainer}>
-                <Ionicons name="person-outline" size={64} color={TEXT_SECONDARY} />
+                <Ionicons
+                  name="person-outline"
+                  size={64}
+                  color={TEXT_SECONDARY}
+                />
                 <Text style={styles.emptyText}>No artists found</Text>
                 <Text style={styles.emptySubtext}>
                   Try refreshing the Artists tab

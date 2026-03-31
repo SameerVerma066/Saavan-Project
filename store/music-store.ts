@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import type { Artist } from "@/services/saavn-api";
 import {
     getRandomArtists,
     getRandomArtistsFromAPI,
@@ -9,7 +10,6 @@ import {
     searchSongs,
 } from "@/services/saavn-api";
 import type { Track } from "@/types/track";
-import type { Artist } from "@/services/saavn-api";
 
 type RepeatMode = "off" | "one" | "all";
 
