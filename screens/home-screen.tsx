@@ -31,7 +31,7 @@ const SECONDARY_BG = "#262641";
 const TEXT_PRIMARY = "#FFFFFF";
 const TEXT_SECONDARY = "#b0b0b0";
 
-const TABS = ["Suggested", "Songs", "Artists", "Albums", "Folder"];
+const TABS = ["Suggested", "Songs", "Searches", "Artists", "Albums"];
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -125,7 +125,7 @@ export function HomeScreen() {
     useCallback(() => {
       if (activeTab === 0) {
         void loadSuggestedTab();
-      } else if (activeTab === 2) {
+      } else if (activeTab === 3) {
         void loadArtistsTab();
       }
     }, [activeTab, loadSuggestedTab, loadArtistsTab]),
@@ -292,7 +292,12 @@ export function HomeScreen() {
               placeholderTextColor={TEXT_SECONDARY}
               style={styles.headerSearchInput}
               onSubmitEditing={() => {
-                setActiveTab(1);
+                const query = searchQuery.trim();
+                if (!query) {
+                  return;
+                }
+
+                setActiveTab(2);
                 void loadInitialSongs();
               }}
               returnKeyType="search"
@@ -545,8 +550,79 @@ export function HomeScreen() {
           </>
         )}
 
-        {/* Artists Tab - Random Artists List */}
+        {/* Searches Tab - Search Results */}
         {activeTab === 2 && (
+          <>
+            {isLoadingSearch && searchResults.length === 0 && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={ACCENT_COLOR} />
+              </View>
+            )}
+
+            {searchResults.length > 0 && (
+              <View style={styles.section}>
+                <FlatList
+                  data={searchResults}
+                  keyExtractor={(item, idx) => `${item.id}-search-${idx}`}
+                  numColumns={2}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.gridRow}
+                  onEndReached={() => void loadMoreSongs()}
+                  onEndReachedThreshold={0.3}
+                  renderItem={({ item, index }) => (
+                    <Pressable
+                      style={styles.gridCard}
+                      onPress={() =>
+                        handlePlayTrack(item, searchResults, index)
+                      }
+                    >
+                      <Image
+                        source={{ uri: item.artwork }}
+                        style={styles.gridImage}
+                      />
+                      <Text numberOfLines={2} style={styles.gridTitle}>
+                        {item.title}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.gridArtist}>
+                        {item.artist}
+                      </Text>
+                    </Pressable>
+                  )}
+                />
+                {isLoadingSearch && (
+                  <ActivityIndicator
+                    size="large"
+                    color={ACCENT_COLOR}
+                    style={styles.loader}
+                  />
+                )}
+              </View>
+            )}
+
+            {!isLoadingSearch && searchResults.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Ionicons
+                  name="search-outline"
+                  size={64}
+                  color={TEXT_SECONDARY}
+                />
+                <Text style={styles.emptyText}>Search for songs</Text>
+                <Text style={styles.emptySubtext}>
+                  Type a song name and press search
+                </Text>
+              </View>
+            )}
+
+            {searchError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{searchError}</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Artists Tab - Random Artists List */}
+        {activeTab === 3 && (
           <>
             {isLoadingArtists && artistsList.length === 0 && (
               <View style={styles.loadingContainer}>
@@ -604,56 +680,12 @@ export function HomeScreen() {
           </>
         )}
 
-        {/* Other Tabs - Search Results */}
-        {activeTab !== 0 && activeTab !== 1 && activeTab !== 2 && (
-          <>
-            {/* Search Results */}
-            {searchResults.length > 0 && (
-              <View style={styles.section}>
-                <FlatList
-                  data={searchResults}
-                  keyExtractor={(item, idx) => `${item.id}-search-${idx}`}
-                  numColumns={2}
-                  scrollEnabled={false}
-                  columnWrapperStyle={styles.gridRow}
-                  onEndReached={() => void loadMoreSongs()}
-                  onEndReachedThreshold={0.3}
-                  renderItem={({ item, index }) => (
-                    <Pressable
-                      style={styles.gridCard}
-                      onPress={() =>
-                        handlePlayTrack(item, searchResults, index)
-                      }
-                    >
-                      <Image
-                        source={{ uri: item.artwork }}
-                        style={styles.gridImage}
-                      />
-                      <Text numberOfLines={2} style={styles.gridTitle}>
-                        {item.title}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.gridArtist}>
-                        {item.artist}
-                      </Text>
-                    </Pressable>
-                  )}
-                />
-                {isLoadingSearch && (
-                  <ActivityIndicator
-                    size="large"
-                    color={ACCENT_COLOR}
-                    style={styles.loader}
-                  />
-                )}
-              </View>
-            )}
-
-            {searchError && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{searchError}</Text>
-              </View>
-            )}
-          </>
+        {/* Albums Tab */}
+        {activeTab === 4 && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="albums-outline" size={64} color={TEXT_SECONDARY} />
+            <Text style={styles.emptyText}>Albums tab coming soon</Text>
+          </View>
         )}
 
         <View style={styles.bottomSpacer} />

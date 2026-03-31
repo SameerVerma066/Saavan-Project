@@ -124,6 +124,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [setPlaybackPosition, setPlaybackState],
   );
 
+  const getPlaybackCandidates = useCallback((track: Track) => {
+    const ordered = [
+      track.streamUrl,
+      ...track.downloadUrls.map((item) => item.url),
+    ]
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+
+    return Array.from(new Set(ordered));
+  }, []);
+
+  const createSoundWithFallback = useCallback(
+    async (track: Track, shouldPlay: boolean, startPosition: number) => {
+      const candidates = getPlaybackCandidates(track);
+      let lastError: unknown = null;
+
+      for (const candidateUrl of candidates) {
+        try {
+          return await Audio.Sound.createAsync(
+            { uri: candidateUrl },
+            {
+              shouldPlay,
+              positionMillis: startPosition,
+              progressUpdateIntervalMillis: 500,
+            },
+            onPlaybackStatusUpdate,
+          );
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+
+      throw new Error("No valid stream URL found for this track");
+    },
+    [getPlaybackCandidates, onPlaybackStatusUpdate],
+  );
+
   const unloadCurrentSound = useCallback(async () => {
     if (!soundRef.current) {
       return;
@@ -157,14 +198,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const { sound, status } = await Audio.Sound.createAsync(
-          { uri: track.streamUrl },
-          {
-            shouldPlay,
-            positionMillis: startPosition,
-            progressUpdateIntervalMillis: 500,
-          },
-          onPlaybackStatusUpdate,
+        const { sound, status } = await createSoundWithFallback(
+          track,
+          shouldPlay,
+          startPosition,
         );
 
         // If a newer request started while creating the sound, discard this one.
@@ -196,7 +233,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [onPlaybackStatusUpdate, unloadCurrentSound],
+    [createSoundWithFallback, unloadCurrentSound],
   );
 
   const playTrack = useCallback(
